@@ -1,0 +1,18 @@
+name: entry/project_timeline
+language: zh
+description: 从项目 activity context 中抽取目标、里程碑、决策、阻塞和下一步。
+fields:
+  project:
+    type: string
+  goal:
+    type: string
+  milestones:
+    type: list
+  decisions:
+    type: list
+  blockers:
+    type: list
+  next_actions:
+    type: list
+  evidence_refs:
+    type: list

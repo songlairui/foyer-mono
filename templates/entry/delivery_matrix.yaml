@@ -1,0 +1,14 @@
+name: entry/delivery_matrix
+language: zh
+description: 记录 CLI、Skill、Plugin、Pi、Flue 等交付形式的职责边界。
+fields:
+  delivery_forms:
+    type: list
+  shared_core:
+    type: string
+  adapter_boundaries:
+    type: list
+  risks:
+    type: list
+  validation:
+    type: list

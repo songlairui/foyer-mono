@@ -1,50 +1,51 @@
 # entry-init-project
 
-Global project initialization capability for the personal `entry` workflow.
+`entry-init-project` 把原本靠长篇 prose skill 执行的项目初始化流程，收敛成一个可测试、可 dry-run、可被多宿主调用的 TypeScript/Effect CLI。
 
-This repo is the future home for a more deterministic replacement of the current
-text-only `init-project` skill. The goal is to turn project creation from a
-model-reasoned procedure into a small, reliable system:
+核心边界是 `entry` CLI。Skill、Code Agent Plugin、Pi Package/Extension 和 Flue Agent 都只负责识别意图、必要确认和调用 CLI，不复制业务流程。
 
-- a global CLI that can initialize projects from any working directory
-- low-context subcommands for inbox, project index, git, GitHub, and device registry operations
-- a concise skill layer that routes intent and delegates deterministic work to the CLI
-- an agent harness design, likely using Flue, for repeatable local, CI, or HTTP-triggered workflows
-- cross-device project topology views showing where repositories are cloned and recently active
+## 当前能力
 
-## Why This Exists
+- `entry project init <slug> --desc <text> --dry-run --json` 输出完整执行计划。
+- `entry project init <slug> --desc <text>` 创建本地项目、中文 README、`docs/kickoff/`、Git 首次提交、activity event 和 Markdown 视图。
+- `--github` 可选调用 `gh repo create` 创建远端仓库并 push。
+- `entry activity query/context/export` 提供低上下文查询、Markdown context、graphify/Hyper-Extract/本地搜索索引导出。
+- `entry inbox append`、`entry project upsert-index`、`entry repo devices/status/manifests`、`entry search` 覆盖最小 entry 辅助接口。
 
-The current `init-project` skill works, but it is mostly prose. Each run asks a
-code agent to reconstruct the same file and repository operations from text.
-This is especially expensive when updating Markdown indexes, because the agent
-often has to read a whole file, decide where to insert, and generate a patch.
+## 快速开始
 
-This project extracts those repeated operations into stable commands so the
-agent spends its tokens on judgment rather than mechanical file surgery.
+```bash
+pnpm install
+pnpm check
+pnpm test
+pnpm cli project init demo-project --desc "用于验证 entry 初始化流程" --dry-run --json
+```
 
-## Initial Shape
+构建后可使用二进制入口：
+
+```bash
+pnpm build
+node dist/cli/index.js project init demo-project --desc "用于验证 entry 初始化流程" --dry-run --json
+```
+
+## 目录
 
 ```text
 entry-init-project/
-  README.md
-  docs/
-    kickoff/
-      2026-05-05-system-thinking.md
-      references.md
+  src/
+    domain/       # contract、错误、路径和渲染
+    services/     # Effect Context/Layer：文件系统、shell、clock
+    workflows/    # project init、activity、inbox、repo
+    cli/          # entry CLI
+  skills/         # 瘦身版 init-project skill
+  adapters/       # Claude Code plugin、Pi package、Flue 说明
+  .flue/          # Flue agent 薄适配壳
+  templates/      # Hyper-Extract/graphify 派生模板
+  docs/           # 中文设计资料
 ```
 
-## Intended Direction
+## 重要约束
 
-The first useful milestone is a CLI MVP:
+`activity/events/**/*.jsonl` 是 append-only 事实源。Agent 不应直接读取这些原始日志；必须通过 `entry activity query`、`entry activity context` 或 `entry activity export` 获取裁剪后的上下文和派生物。
 
-```bash
-entry project init "project-name" --desc "..."
-entry inbox append --lane agent_loop_research --project project-name
-entry project upsert-index project-name
-entry repo devices
-entry repo status --all
-```
-
-After that, the existing `init-project` skill can shrink to a thin dispatcher:
-identify intent, choose or generate a project name, call the CLI, and summarize
-the result.
+Markdown、FTS、graphify、Hyper-Extract 输出都是可删除、可重建的 derived artifacts，不能反向覆盖事实源。

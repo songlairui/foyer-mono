@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.flue-dist/
+.DS_Store
+*.log
+.env
+.env.*
+!adapters/claude-code-plugin/.mcp.json

@@ -1,0 +1,10 @@
+#!/usr/bin/env sh
+set -eu
+
+if [ -n "${ENTRY_INIT_PROJECT_CLI:-}" ]; then
+  exec "$ENTRY_INIT_PROJECT_CLI" "$@"
+fi
+
+PLUGIN_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+REPO_DIR="$(CDPATH= cd -- "$PLUGIN_DIR/../.." && pwd)"
+exec node "$REPO_DIR/dist/cli/index.js" "$@"

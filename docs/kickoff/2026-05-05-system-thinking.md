@@ -1,168 +1,105 @@
-# init-project Capability: System Thinking
+# init-project 能力：系统化思考
 
-Date: 2026-05-05
+日期：2026-05-05
 
-## User Intent
+## 用户意图
 
-Create a dedicated repo for evolving the current `init-project` skill into a
-global project initialization capability.
+为现有 `init-project` skill 建立一个专用仓库，把它从“长篇操作说明”演进为全局项目初始化能力。
 
-The motivating observation is that the existing skill depends too much on prose.
-The agent repeatedly thinks through file operations, Markdown insertion, git
-setup, GitHub repo creation, and project index maintenance. That makes each run
-slower and less deterministic than it needs to be.
+关键观察是：当前 skill 让 agent 每次重新理解目录创建、Markdown 插入、Git 初始化、GitHub 仓库创建和项目索引维护。这些操作确定、重复、可测试，不应该长期停留在 prompt 里。
 
-## Core Reframe
+## 核心重构
 
-This is not mainly a prompt-quality problem. It is an architecture problem.
+这不是 prompt 写得不够好的问题，而是职责边界问题。
 
-The current skill should evolve from:
+目标形态：
 
 ```text
-long procedural instruction -> model reconstructs operations every time
+瘦身 skill dispatcher -> 确定性 CLI 子命令 -> append-only 事实和派生视图
 ```
 
-into:
+模型继续负责命名、意图识别、摘要、冲突解释和确认问题；CLI 负责目录、文件、Git、GitHub、entry event、索引和设备扫描。
 
-```text
-small skill dispatcher -> deterministic CLI subcommands -> append-only state and views
-```
+## 分层
 
-The model should handle naming, intent recognition, summary writing, and conflict
-explanation. The CLI should handle stable operations: directory creation, file
-append, index updates, registry updates, git, GitHub, and device scans.
+### 1. Skill 层
 
-## Proposed Layers
+职责：
 
-### 1. Skill Layer
+- 识别项目初始化请求。
+- 收集或推断项目名、描述、lane、owner。
+- 先调用 CLI dry-run。
+- 只在远端发布、覆盖、secret、不可逆动作时确认。
+- 返回中文摘要。
 
-Keep `SKILL.md` short.
+非职责：
 
-Responsibilities:
+- 读取完整 Markdown 索引。
+- 手工决定插入位置。
+- 每次重建 Git/GitHub 命令序列。
 
-- trigger on project initialization requests
-- collect or infer project name and description
-- call the global CLI
-- only ask questions for external accounts, destructive actions, secrets, or irreversible publication
-- summarize created artifacts
+### 2. CLI 层
 
-Non-responsibilities:
-
-- reading entire Markdown indexes
-- manually deciding insertion points
-- reconstructing git/GitHub command sequences each run
-
-### 2. CLI Layer
-
-Provide stable commands that an agent can call without loading much context.
-
-Candidate commands:
+提供低上下文、稳定 JSON 输出的命令：
 
 ```bash
-entry project init <name> --desc <text>
-entry project upsert-index <name> --lane <lane> --status <status>
-entry inbox append --title <title> --raw-file <path>
-entry activity append --event project.created --project <name>
-entry repo devices
-entry repo status --all
+entry project init <name> --desc <text> --dry-run --json
+entry project upsert-index <name> --desc <text> --json
+entry inbox append --project <name> --raw-file <path> --json
+entry activity query --project <name> --json
+entry activity context --project <name> --budget 6000 --format markdown
+entry activity export --scope project:<name> --target graphify-corpus
+entry repo devices --json
+entry repo status --all --json
 ```
 
-The CLI should own structured parsing and mutation. Markdown can remain a human
-view, but it should not be the only database.
+CLI 拥有结构化解析和 mutation。Markdown 保留为人类视图，但不是唯一数据库。
 
-### 3. State Layer
+### 3. 状态层
 
-Use append-only data for facts and generate materialized views for humans.
-
-Candidate data:
+事实使用 append-only JSONL，视图由代码生成：
 
 - project registry
 - activity events
 - device registry
-- repo clone manifests
-- sync frontiers
-- generated views such as project index, device dashboard, and daily inbox
+- repo clone manifest
+- sync frontier
+- project index、daily inbox、timeline 等 Markdown 视图
 
-This follows the existing `entry` direction: preserve leaves, exchange manifests,
-then stitch materialized views.
+原则是保留事实，不重写历史。多设备冲突应生成可解释的 merge note，而不是丢弃其中一边。
 
-### 4. Agent Harness Layer
+### 4. Agent Harness 层
 
-Use Flue as a design reference for turning this into a programmable agent
-harness instead of only a local skill.
+Flue 用作可部署 agent harness 的参考，而不是替代 CLI。
 
-Flue is useful here because it separates:
+Flue 层接收自然语言 payload，用 LLM 提取结构化意图，然后调用同一个 CLI dry-run/execute。核心 workflow 不写进 prompt。
 
-- model
-- harness
-- skills
-- sessions
-- filesystem/sandbox
-- CLI or HTTP triggering
+## 全局使用
 
-That matches the desired shape: a project initialization agent that can run
-locally, from CI, or from another app without depending on one chat session.
-
-## Global Usage
-
-The capability should work from any directory.
-
-The user should not need to `cd` into a project root before asking for a new
-project. Configuration should resolve the personal project root, GitHub owner,
-visibility, entry root, device identity, and sync behavior.
-
-Possible config path:
-
-```text
-~/.config/entry/config.toml
-```
-
-Possible defaults:
+能力应从任意目录运行。配置解析默认值：
 
 ```toml
 projects_root = "~/repo/projects"
 entry_root = "~/entry"
-github_owner = "songlairui"
 github_visibility = "private"
-device_name = "lary-mbp.local"
+device_name = "<hostname>"
 ```
 
-## Cross-Device Extension
+环境变量可覆盖：
 
-The same capability can grow into a personal project topology system.
+- `PROJECTS_ROOT`
+- `ENTRY_ROOT`
+- `GITHUB_OWNER`
+- `GITHUB_VISIBILITY`
+- `DEVICE_NAME`
 
-Questions it should eventually answer:
+## 维护原则
 
-- Which repositories exist in the unified project root?
-- Which devices have cloned each repository?
-- Which device touched a project most recently?
-- Which repos are dirty, ahead, behind, or missing remotes?
-- Which device/session created or promoted a project?
-- Where are sync conflicts present, and what are the preserved branches?
+不要继续膨胀 skill prose。每次发现重复操作，判断它属于：
 
-The important rule is to preserve facts, not overwrite history. If two devices
-edit independently, record both events and generate a merge note.
+- skill 文本：判断边界和确认策略。
+- CLI 命令：确定性重复操作。
+- reference doc：偶尔需要的背景。
+- generated view：结构化事实的中文投影。
 
-## Maintenance Principle
-
-Do not keep expanding the skill prose.
-
-Each time a repeated operation appears, decide whether it belongs in:
-
-- skill text: variable judgment and policy
-- CLI command: deterministic repeated operation
-- reference doc: background that is only sometimes needed
-- generated view: human-readable projection of structured state
-
-The direction is to reduce agent context load over time, not merely make the
-instructions more elaborate.
-
-## Suggested Milestones
-
-1. CLI MVP: create project directories, README, kickoff folder, git init, GitHub private repo, first commit and push.
-2. Entry integration: append inbox, update project index, append activity event via CLI rather than manual Markdown patches.
-3. Global install: make the CLI callable from any directory.
-4. Device registry: scan local clones and write device/repo manifests.
-5. Skill rewrite: shrink `init-project` into a dispatcher that calls the CLI.
-6. Flue prototype: expose project initialization as a programmable agent workflow.
-7. Dashboard/view: render project topology and cross-device activity.
+目标是持续降低 agent 上下文负担。

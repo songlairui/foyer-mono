@@ -1,0 +1,8 @@
+{
+  "preCommand": [
+    {
+      "name": "entry-init-project-dry-run-first",
+      "description": "涉及项目初始化时优先使用 entry project init --dry-run --json。"
+    }
+  ]
+}

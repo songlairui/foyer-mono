@@ -1,0 +1,6 @@
+{
+  "entryInitProject": {
+    "cli": "entry",
+    "dryRunFirst": true
+  }
+}

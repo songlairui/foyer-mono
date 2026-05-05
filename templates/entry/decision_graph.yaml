@@ -1,0 +1,14 @@
+name: entry/decision_graph
+language: zh
+description: 从项目记录中抽取决策节点、依据、影响范围和后续验证方式。
+fields:
+  decisions:
+    type: graph
+    node_fields:
+      id: string
+      title: string
+      rationale: string
+      confidence: string
+    edge_fields:
+      relation: string
+      evidence_ref: string

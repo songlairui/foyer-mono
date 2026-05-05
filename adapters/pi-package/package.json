@@ -1,0 +1,10 @@
+{
+  "name": "@entry/init-project-pi",
+  "version": "0.1.0",
+  "description": "Pi package：通过 entry CLI 初始化项目并登记 entry。",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "check": "tsc --noEmit"
+  }
+}

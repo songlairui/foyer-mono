@@ -1,0 +1,14 @@
+name: entry/device_repo_topology
+language: zh
+description: 记录设备、仓库 clone、最近活动和同步 frontier 的派生拓扑。
+fields:
+  devices:
+    type: list
+  repositories:
+    type: list
+  clone_edges:
+    type: list
+  dirty_repos:
+    type: list
+  missing_remotes:
+    type: list
