@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { EntryWorkflowError, errorToJson } from "../src/domain/errors";
 import { Clock, FileSystem, NodeFileSystemLive, Shell } from "../src/services/context";
 import { fakeShell, fixedClock } from "../src/services/test-context";
+import { runDoctor } from "../src/workflows/doctor";
 import { executeProjectInit, planProjectInit } from "../src/workflows/project-init";
 
 const tempDirs: string[] = [];
@@ -66,6 +67,36 @@ describe("project init workflow", () => {
     await expect(readFile(result.entryEventPath, "utf8")).resolves.toContain("\"event\":\"project.created\"");
     await expect(readFile(result.views.projectPage, "utf8")).resolves.toContain("# happy-path");
     await expect(readFile(result.views.projectIndex, "utf8")).resolves.toContain("[happy-path]");
+  });
+
+  it("reports entry data through read-only doctor", async () => {
+    const root = await tempRoot();
+    const entryRoot = path.join(root, "entry");
+    await mkdir(path.join(entryRoot, "projects"), { recursive: true });
+    await runWithServices(
+      executeProjectInit({
+        slug: "doctor-path",
+        description: "doctor dashboard 项目",
+        projectsRoot: path.join(root, "projects"),
+        entryRoot
+      })
+    );
+
+    const report = await runWithServices(
+      runDoctor({
+        projectsRoot: path.join(root, "projects"),
+        entryRoot,
+        project: "doctor-path"
+      })
+    );
+
+    expect(report.readonly).toBe(true);
+    expect(report.facts.activityEvents).toBe(1);
+    expect(report.sidecars.nodes).toBe(1);
+    expect(report.sidecars.frontiers).toBe(1);
+    expect(report.sidecars.manifests).toBe(1);
+    expect(report.views.projectPages).toBe(1);
+    expect(report.facts.recentEvents[0]?.project).toBe("doctor-path");
   });
 
   it("fails when target directory already exists", async () => {

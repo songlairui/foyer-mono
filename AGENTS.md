@@ -1,10 +1,11 @@
-# Agent 约束
+# Agent 开发规则
 
-本仓库的目标是把 `init-project` 的确定性流程下沉到 CLI/Effect 层。Agent 使用本能力时遵守以下规则：
+本仓库的目标是把 `init-project` 的确定性流程下沉到 CLI/Effect 层。修改本仓库时遵守以下规则：
 
 - 使用 `pnpm` 管理依赖和脚本。
-- 默认调用 `entry project init --dry-run --json` 获取计划，再根据风险决定是否执行。
-- 不直接读取或 patch `~/entry/activity/events/**/*.jsonl`。
-- 查询历史必须通过 `entry activity query`、`entry activity context` 或 `entry activity export`。
-- 不让 LLM 持有 GitHub token、API key、cookie、`.env` 或本地 secret。
-- 用户可见文档、skill 文档、Flue role、生成到 `~/entry` 的记录默认使用中文。
+- 确定性流程放在 `src/workflows` 和 `src/cli`，宿主 adapter 只做分发和调用。
+- 涉及 entry 历史数据的验证使用临时 `--entry-root`，不要直接改真实 `~/entry`。
+- 不直接 patch `activity/events/**/*.jsonl`；新增写入路径必须走 CLI/workflow。
+- 不提交 `dist/`、`.flue-dist/`、`node_modules/`、`.env*` 或本地 secret。
+- 提交前至少运行 `pnpm check` 和 `pnpm test`。
+- 新增用户可见仓库文档默认使用中文；代码标识符、命令名、schema 字段可以保留英文。

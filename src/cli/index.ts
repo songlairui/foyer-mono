@@ -3,6 +3,7 @@ import { Command } from "commander";
 import { Effect } from "effect";
 import { readFileSync } from "node:fs";
 import { appendActivity, activityContext, exportActivity, queryActivity, searchActivity } from "../workflows/activity";
+import { runDoctor } from "../workflows/doctor";
 import { appendInbox } from "../workflows/inbox";
 import { executeProjectInit, planProjectInit, upsertProjectIndex } from "../workflows/project-init";
 import { repoDevices, repoManifests, repoStatus } from "../workflows/repo";
@@ -171,6 +172,18 @@ repo
   .description("通过 CLI 扫描 activity/manifests，供跨设备拼接使用")
   .action(async (options) => {
     await run(repoManifests({ entryRoot: options.entryRoot }), options);
+  });
+
+program
+  .command("doctor")
+  .option("--entry-root <path>", "entry 根目录")
+  .option("--projects-root <path>", "项目根目录")
+  .option("--project <slug>", "只查看某个项目的 activity event")
+  .option("--limit <n>", "最近事件数量", parseInteger, 10)
+  .option("--json", "输出稳定 JSON")
+  .description("只读 dashboard：列出 entry 历史数据、sidecar、视图、派生物和本地仓库状态")
+  .action(async (options) => {
+    await run(runDoctor({ entryRoot: options.entryRoot, projectsRoot: options.projectsRoot, project: options.project, limit: options.limit }), options);
   });
 
 program

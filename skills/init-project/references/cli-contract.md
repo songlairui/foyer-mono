@@ -17,6 +17,8 @@ entry activity export --scope project:<slug> --target hyperextract-ka
 entry repo devices --json
 entry repo status --all --json
 entry repo manifests --json
+entry doctor --json
+entry doctor --project <slug> --json
 entry search "<query>" --project <slug> --json
 ```
 
