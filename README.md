@@ -14,7 +14,85 @@
 
 ## 使用方式
 
-### CLI
+推荐交付形态是 “npm 发布的 CLI + GitHub 发布的 skill”。Skill 只负责理解自然语言、确认计划和调用 `entry`，所以安装 skill 前必须先确保本机能运行 `entry` CLI。
+
+### 安装 CLI
+
+CLI 通过 npm 包分发。当前 `package.json` 的包名是 `entry-init-project`，二进制命令名是 `entry`。发布到 npm 后，用户可以全局安装：
+
+```bash
+npm install -g entry-init-project
+entry --help
+```
+
+如果希望继续使用 `pnpm` 管理全局包，也可以：
+
+```bash
+pnpm add -g entry-init-project
+entry --help
+```
+
+发布包时先完成检查和构建：
+
+```bash
+pnpm install
+pnpm check
+pnpm test
+pnpm build
+npm whoami
+pnpm pack --dry-run
+pnpm publish --dry-run
+pnpm publish
+```
+
+如果未来把包名改成 scoped package，例如 `@<scope>/entry-init-project`，首次公开发布时使用：
+
+```bash
+pnpm publish --access public
+```
+
+### 安装 Skill
+
+Skill 默认随 GitHub 仓库发布，路径是 `skills/init-project/`。安装到 Codex 后，它会调用已经安装好的 `entry` CLI：
+
+```bash
+python ~/.codex/skills/.system/skill-installer/scripts/install-skill-from-github.py \
+  --repo <owner>/entry-init-project \
+  --path skills/init-project
+```
+
+安装后重启 Codex，让新的 skill 生效。私有仓库可以继续使用本机已有的 GitHub 凭据，或在执行安装前配置 `GITHUB_TOKEN` / `GH_TOKEN`。
+
+如果宿主不使用 Codex skill installer，也可以把 GitHub 仓库里的 `skills/init-project/` 复制到宿主约定的 skills 目录。不要复制 CLI/workflow 逻辑；skill 内只保留调用 `entry` 的说明。
+
+### 本地开发安装
+
+本地调试 CLI 时，先安装依赖并构建，再把当前工作副本 link 成全局命令：
+
+```bash
+pnpm install
+pnpm build
+pnpm link --global
+entry --help
+```
+
+不想全局 link 时，可以直接跑源码入口：
+
+```bash
+pnpm cli --help
+pnpm cli project init demo-project --desc "用于验证 entry 初始化流程" --dry-run --json
+```
+
+本地调试 skill 时，只在项目内创建符号链接，这样宿主如果扫描 `.agents/skills/*`，就能直接使用当前仓库维护的 skill，同时不用复制两份：
+
+```bash
+mkdir -p .agents/skills
+ln -s ../../skills/init-project .agents/skills/init-project
+```
+
+如果目标目录已存在，先确认里面没有需要保留的本地修改，再删除或改名后重新链接。
+
+### 运行 CLI
 
 CLI 是稳定边界，适合人、agent、CI 和未来宿主 adapter 调用。初始化项目时先看计划：
 
@@ -51,7 +129,7 @@ entry doctor --project demo-project --json
 
 doctor 会汇总 entry 根目录、activity event、nodes/frontier/manifests、Markdown 视图、derived 文件、本地 repo 状态和 warnings。
 
-### Skill
+### 使用 Skill
 
 日常让 code agent 接管“新建项目目录组织的心理负担”时，优先使用 `skills/init-project/SKILL.md`。Skill 只做三件事：
 
