@@ -2,6 +2,8 @@ import os from "node:os";
 import path from "node:path";
 import type { RuntimeConfig } from "./contracts";
 
+export const DEFAULT_FOYER_ROOT = "~/.foyer";
+
 export function expandHome(input: string): string {
   if (input === "~") return os.homedir();
   if (input.startsWith("~/")) return path.join(os.homedir(), input.slice(2));
@@ -10,6 +12,7 @@ export function expandHome(input: string): string {
 
 export function resolveConfig(overrides: {
   projectsRoot?: string;
+  foyerRoot?: string;
   entryRoot?: string;
   githubOwner?: string;
   githubVisibility?: RuntimeConfig["githubVisibility"];
@@ -17,7 +20,9 @@ export function resolveConfig(overrides: {
 }): RuntimeConfig {
   return {
     projectsRoot: path.resolve(expandHome(overrides.projectsRoot ?? process.env.PROJECTS_ROOT ?? "~/repo/projects")),
-    entryRoot: path.resolve(expandHome(overrides.entryRoot ?? process.env.ENTRY_ROOT ?? "~/entry")),
+    entryRoot: path.resolve(
+      expandHome(overrides.foyerRoot ?? overrides.entryRoot ?? process.env.FOYER_ROOT ?? process.env.ENTRY_ROOT ?? DEFAULT_FOYER_ROOT)
+    ),
     githubOwner: overrides.githubOwner ?? process.env.GITHUB_OWNER,
     githubVisibility: overrides.githubVisibility ?? normalizeVisibility(process.env.GITHUB_VISIBILITY),
     deviceName: overrides.deviceName ?? process.env.DEVICE_NAME ?? os.hostname()

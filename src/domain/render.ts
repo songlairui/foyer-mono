@@ -12,7 +12,7 @@ ${request.description}
 
 - lane: ${request.lane}
 - owner: ${request.owner}
-- 初始化方式: entry project init
+- 初始化方式: foyer project init
 
 ## 目录
 
@@ -47,7 +47,7 @@ ${request.description}
 ## 下一步
 
 - 补充 \`docs/kickoff/\` 启动资料。
-- 用 \`entry activity context --project ${request.slug} --budget 6000 --format markdown\` 生成低上下文继续材料。
+- 用 \`foyer activity context --project ${request.slug} --budget 6000 --format markdown\` 生成低上下文继续材料。
 
 ## Activity Sources
 

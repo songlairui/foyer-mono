@@ -7,7 +7,7 @@ import { EntryWorkflowError, errorToJson } from "../src/domain/errors";
 import { Clock, FileSystem, NodeFileSystemLive, Shell } from "../src/services/context";
 import { fakeShell, fixedClock } from "../src/services/test-context";
 import { runDoctor } from "../src/workflows/doctor";
-import { executeProjectInit, planProjectInit } from "../src/workflows/project-init";
+import { executeProjectInit, listProjects, planProjectInit } from "../src/workflows/project-init";
 
 const tempDirs: string[] = [];
 
@@ -35,7 +35,7 @@ describe("project init workflow", () => {
     expect(plan.steps.map((step) => step.id)).toEqual([
       "validate-input",
       "check-project-path",
-      "check-entry-root",
+      "prepare-foyer-root",
       "create-local-files",
       "git-init",
       "github-create",
@@ -63,6 +63,7 @@ describe("project init workflow", () => {
 
     expect(result.kind).toBe("project-init-result");
     expect(commands).toEqual(["git init", "git add README.md docs/kickoff/.gitkeep", "git commit -m init project"]);
+    expect(result.entryEventPath).toContain(path.join("entry", "activity", "events"));
     await expect(readFile(path.join(root, "projects", "happy-path", "README.md"), "utf8")).resolves.toContain("中文 happy path 项目");
     await expect(readFile(result.entryEventPath, "utf8")).resolves.toContain("\"event\":\"project.created\"");
     await expect(readFile(result.views.projectPage, "utf8")).resolves.toContain("# happy-path");
@@ -99,6 +100,34 @@ describe("project init workflow", () => {
     expect(report.facts.recentEvents[0]?.project).toBe("doctor-path");
   });
 
+  it("lists projects started through activity events", async () => {
+    const root = await tempRoot();
+    const entryRoot = path.join(root, "entry");
+    await runWithServices(
+      executeProjectInit({
+        slug: "alpha-project",
+        description: "第一个落户项目",
+        projectsRoot: path.join(root, "projects"),
+        entryRoot
+      })
+    );
+    await runWithServices(
+      executeProjectInit({
+        slug: "beta-project",
+        description: "第二个落户项目",
+        projectsRoot: path.join(root, "projects"),
+        entryRoot
+      })
+    );
+
+    const result = await runWithServices(listProjects({ entryRoot }));
+
+    expect(result.kind).toBe("project-list-result");
+    expect(result.projects.map((project) => project.slug)).toEqual(["alpha-project", "beta-project"]);
+    expect(result.projects[0]?.description).toBe("第一个落户项目");
+    expect(result.humanOutputZh).toContain("已启动项目（2）");
+  });
+
   it("fails when target directory already exists", async () => {
     const root = await tempRoot();
     const entryRoot = path.join(root, "entry");
@@ -106,12 +135,12 @@ describe("project init workflow", () => {
     await mkdir(entryRoot, { recursive: true });
 
     await expectFailureCode(
-        executeProjectInit({
-          slug: "already-here",
-          description: "目录已存在",
-          projectsRoot: path.join(root, "projects"),
-          entryRoot
-        }),
+      executeProjectInit({
+        slug: "already-here",
+        description: "目录已存在",
+        projectsRoot: path.join(root, "projects"),
+        entryRoot
+      }),
       "DIRECTORY_ALREADY_EXISTS"
     );
   });
@@ -122,30 +151,32 @@ describe("project init workflow", () => {
     await mkdir(entryRoot, { recursive: true });
 
     await expectFailureCode(
-        executeProjectInit({
-          slug: "needs-gh",
-          description: "需要 GitHub",
-          projectsRoot: path.join(root, "projects"),
-          entryRoot,
-          createGithub: true
-        }),
+      executeProjectInit({
+        slug: "needs-gh",
+        description: "需要 GitHub",
+        projectsRoot: path.join(root, "projects"),
+        entryRoot,
+        createGithub: true
+      }),
       "GH_UNAVAILABLE",
       { missing: ["gh"] }
     );
   });
 
-  it("fails when entry write target is missing", async () => {
+  it("creates the Foyer data root when it is missing", async () => {
     const root = await tempRoot();
+    const entryRoot = path.join(root, "entry");
 
-    await expectFailureCode(
-        executeProjectInit({
-          slug: "missing-entry",
-          description: "entry 不存在",
-          projectsRoot: path.join(root, "projects"),
-          entryRoot: path.join(root, "entry")
-        }),
-      "ENTRY_TARGET_MISSING"
+    const result = await runWithServices(
+      executeProjectInit({
+        slug: "missing-root",
+        description: "数据根不存在也应由 CLI 托管创建",
+        projectsRoot: path.join(root, "projects"),
+        entryRoot
+      })
     );
+
+    await expect(readFile(result.views.projectIndex, "utf8")).resolves.toContain("[missing-root]");
   });
 });
 

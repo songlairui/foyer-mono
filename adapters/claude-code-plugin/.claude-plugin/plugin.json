@@ -1,7 +1,7 @@
 {
   "name": "entry-init-project",
   "version": "0.1.0",
-  "description": "用 entry CLI 初始化项目、记录 activity，并提供瘦身版 init-project skill。",
+  "description": "用 foyer CLI 初始化项目、记录 activity，并提供瘦身版 init-project skill。",
   "author": "larysong",
   "license": "MIT"
 }

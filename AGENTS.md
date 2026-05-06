@@ -1,6 +1,8 @@
 # Agent 开发规则
 
-本仓库的目标是把 `init-project` 的确定性流程下沉到 CLI/Effect 层。修改本仓库时遵守以下规则：
+本仓库是开发，迭代，优化 `init-project` 技能的源仓库
+
+已经将raw 节能的确定性流程下沉到 CLI/Effect 层。修改本仓库时遵守以下规则：
 
 - 使用 `pnpm` 管理依赖和脚本。
 - 确定性流程放在 `src/workflows` 和 `src/cli`，宿主 adapter 只做分发和调用。

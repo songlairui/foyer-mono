@@ -60,7 +60,7 @@ export function runDoctor(input: {
     const entryRootExists = yield* fs.exists(config.entryRoot);
     const projectsRootExists = yield* fs.exists(config.projectsRoot);
 
-    if (!entryRootExists) warnings.push(`entry 根目录不存在：${config.entryRoot}`);
+    if (!entryRootExists) warnings.push(`Foyer 数据根目录不存在：${config.entryRoot}`);
     if (!projectsRootExists) warnings.push(`projects 根目录不存在：${config.projectsRoot}`);
 
     const eventsRoot = path.join(config.entryRoot, "activity", "events");

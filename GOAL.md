@@ -6,11 +6,11 @@
 
 最终效果不是“把原来的 `SKILL.md` 改写得更长”，也不是“把 skill 替换成 Flue”。真正目标是把重复、确定、可审计的流程下沉到代码和 CLI，把 LLM 保留在命名、意图澄清、摘要、冲突解释和不可完全确定的判断点上。不同宿主只负责交付和触发同一套能力。
 
-系统应该能稳定创建项目、记录过程、更新 `~/entry` 的 append-only 事实，并提供低上下文查询、投影导出和派生抽取接口。`jsonl` 是事实源；Markdown 视图、全文索引、graphify 图谱和 Hyper-Extract Knowledge Abstract 都是可重建的 derived artifacts。
+系统应该能稳定创建项目、记录过程、更新 `~/.foyer` 的 append-only 事实，并提供低上下文查询、投影导出和派生抽取接口。`jsonl` 是事实源；Markdown 视图、全文索引、graphify 图谱和 Hyper-Extract Knowledge Abstract 都是可重建的 derived artifacts。
 
 ## 背景判断
 
-现有 `init-project` skill 已经证明了场景真实存在：用户只要说出项目意图，系统就能创建本地 repo、GitHub 私有仓库、README、kickoff 目录，并把过程记录回 `~/entry`。
+现有 `init-project` skill 已经证明了场景真实存在：用户只要说出项目意图，系统就能创建本地 repo、GitHub 私有仓库、README、kickoff 目录，并把过程记录回 `~/.foyer`。
 
 当前问题主要不是 prompt 不够好，而是流程职责放错了位置。每次执行都让模型重新理解 Markdown 插入、目录创建、Git 命令、GitHub 命令和 activity 记录，会带来三个成本：
 
@@ -27,7 +27,7 @@
 这个方向也足够“科学”，前提是后续实现必须可测量、可复现、可失败恢复。每一个架构假设都应对应验证方式：
 
 - 假设：代码化流程比 prose skill 更稳定。
-  验证：同一输入重复运行多次，比较输出目录、entry 事件、Markdown 视图和 Git 状态是否一致。
+  验证：同一输入重复运行多次，比较输出目录、Foyer 事件、Markdown 视图和 Git 状态是否一致。
 - 假设：LLM 只处理判断点会降低上下文负担。
   验证：记录每次运行读取的上下文文件数、模型调用次数、人工澄清次数和总耗时。
 - 假设：append-only 事件比直接编辑 Markdown 更适合跨设备。
@@ -47,10 +47,10 @@
 
 Effect 层应覆盖：
 
-- 配置解析：`projects_root`、`entry_root`、`github_owner`、默认可见性、设备名。
+- 配置解析：`projects_root`、`foyer_root`、`github_owner`、默认可见性、设备名。
 - 输入校验：项目名、描述、lane、owner、路径安全性。
 - 资源控制：临时文件、目录创建、Git 仓库、GitHub 调用、回滚/补偿动作。
-- 结构化错误：目录已存在、`gh` 未登录、远端 repo 已存在、网络失败、entry 写入冲突。
+- 结构化错误：目录已存在、`gh` 未登录、远端 repo 已存在、网络失败、Foyer 写入冲突。
 - 事件记录：每一步产生 machine-readable event，供恢复、审计和 materialized view 使用。
 - 并发边界：跨设备扫描、repo status、manifest 合并可以并发；项目创建主流程保持顺序和幂等。
 
@@ -63,18 +63,19 @@ CLI 是所有交付形式共享的稳定边界。它既给人类使用，也给 
 候选命令：
 
 ```bash
-entry project init <slug> --desc <text> --json
-entry project init <slug> --desc <text> --dry-run --json
-entry project plan --input request.json --json
-entry inbox append --project <slug> --raw-file <path> --json
-entry project upsert-index <slug> --json
-entry activity append --event project.created --project <slug> --json
-entry repo devices --json
-entry repo status --all --json
-entry activity query --project <slug> --json
-entry activity context --project <slug> --budget 6000 --format markdown
-entry activity export --scope project:<slug> --target graphify-corpus
-entry activity export --scope project:<slug> --target hyperextract-input
+foyer project init <slug> --desc <text> --json
+foyer project init <slug> --desc <text> --dry-run --json
+foyer project plan --input request.json --json
+foyer project list --json
+foyer inbox append --project <slug> --raw-file <path> --json
+foyer project upsert-index <slug> --json
+foyer activity append --event project.created --project <slug> --json
+foyer repo devices --json
+foyer repo status --all --json
+foyer activity query --project <slug> --json
+foyer activity context --project <slug> --budget 6000 --format markdown
+foyer activity export --scope project:<slug> --target graphify-corpus
+foyer activity export --scope project:<slug> --target hyperextract-input
 ```
 
 CLI 必须支持稳定 JSON 输出、`--dry-run`、幂等检查、明确 exit code、可恢复错误、帮助文本兜底和中文人类摘要。
@@ -98,7 +99,7 @@ skills/
       examples.md
 ```
 
-Skill 不再手工重建文件/Git/GitHub/entry 过程。只要某段流程在泥石流版中反复出现，就应被抽取到 CLI/Effect 层。
+Skill 不再手工重建文件/Git/GitHub/Foyer 过程。只要某段流程在泥石流版中反复出现，就应被抽取到 CLI/Effect 层。
 
 ### 4. Code Agent Plugin / Package
 
@@ -123,7 +124,7 @@ Flue agent 保留为服务化和自动化交付形式，而不是唯一目标。
     project-planner.md
 ```
 
-初始部署目标建议选择 Node.js，因为项目初始化需要访问本机文件系统、`git`、`gh`、`~/repo/projects` 和 `~/entry`。Flue 的 local sandbox 与受控 command grant 机制适合这个单用户、本机自动化场景。
+初始部署目标建议选择 Node.js，因为项目初始化需要访问本机文件系统、`git`、`gh`、`~/repo/projects` 和 `~/.foyer`。Flue 的 local sandbox 与受控 command grant 机制适合这个单用户、本机自动化场景。
 
 Flue agent 的职责：
 
@@ -136,7 +137,7 @@ Flue agent 的职责：
 
 ### 6. Entry 存档、视图与派生抽取层
 
-`~/entry` 继续作为事实与视图的承载位置，但应减少模型直接手工编辑。
+`~/.foyer` 作为事实与视图的承载位置，应减少模型直接手工编辑。
 
 事实层继续使用 append-only JSONL：
 
@@ -213,6 +214,11 @@ entry-init-project/
 - 不把 graphify 的 `graph.json` 或 Hyper-Extract 的 `data.json` 当作事实源。
 - 不为了使用 Flue 而把确定性逻辑塞进 prompt。
 
+## 未来 TODO
+
+- 增加 Web 控制台，用于手动操作和把相近项目分组。
+- 设计关联的远程 repo 支持：GitHub 当前已有；未来支持记录/配置私有部署地址的 GitLab 和 Gitea。
+
 ## 中文交付规范
 
 从本文件开始，面向用户的项目文件默认使用中文交付，包括：
@@ -220,7 +226,7 @@ entry-init-project/
 - README、GOAL、kickoff、设计文档、ADR。
 - Flue role 和 skill 文档。
 - Agent 返回给用户的摘要。
-- 生成到 `~/entry` 的 inbox、project page 和 activity view。
+- 生成到 `~/.foyer` 的 inbox、project page 和 activity view。
 
 代码标识符、包名、命令、schema 字段和外部协议名可以保留英文。
 
@@ -230,9 +236,9 @@ entry-init-project/
 
 - 定义核心 contract：`ProjectInitRequest`、`ProjectInitPlan`、`ProjectInitResult`、错误类型和 activity event 类型。
 - Effect workflow 能在 dry-run 模式下打印完整执行计划。
-- CLI 支持 `entry project init --dry-run --json` 和 `entry project init --help`。
+- CLI 支持 `foyer project init --dry-run --json`、`foyer project init --help` 和 `foyer project list`。
 - 瘦身版 Skill 能调用 CLI dry-run，并在参数不清楚时读取 CLI help。
-- 至少有一个 happy-path 测试和三个失败测试：目录已存在、`gh` 不可用、entry 写入目标缺失。
+- 至少有一个 happy-path 测试和覆盖目录已存在、`gh` 不可用、数据根自动创建、项目列表的测试。
 - 明确禁止 agent 直接读取 `activity/events/**/*.jsonl`，只通过 CLI 查询和导出。
 - 所有用户可见文档和生成记录为中文。
 
@@ -241,9 +247,9 @@ entry-init-project/
 - 实际创建本地项目 repo。
 - 初始化 Git 并生成第一提交。
 - 可选创建 GitHub 私有仓库并 push。
-- 追加 entry activity event。
+- 追加 Foyer activity event。
 - 更新或生成对应 Markdown 视图。
-- 提供 `entry activity query/context/export` 的最小实现。
+- 提供 `foyer activity query/context/export` 的最小实现。
 - 提供 FTS 或等价本地搜索派生层，用于精确搜索和原文引用。
 - 在失败后给出可恢复状态，而不是留下不可解释的半成品。
 

@@ -18,6 +18,7 @@ export const ProjectInitRequestSchema = z.object({
   lane: z.string().min(1).max(120).default("project"),
   owner: OwnerSchema.default("me"),
   projectsRoot: z.string().optional(),
+  foyerRoot: z.string().optional(),
   entryRoot: z.string().optional(),
   githubOwner: z.string().optional(),
   githubVisibility: VisibilitySchema.default("private"),
@@ -113,6 +114,39 @@ export const ProjectInitResultSchema = z.object({
 });
 
 export type ProjectInitResult = z.infer<typeof ProjectInitResultSchema>;
+
+export const ProjectListRequestSchema = z.object({
+  foyerRoot: z.string().optional(),
+  entryRoot: z.string().optional(),
+  limit: z.number().int().positive().max(1000).default(1000)
+});
+
+export type ProjectListRequest = z.infer<typeof ProjectListRequestSchema>;
+
+export const ProjectListItemSchema = z.object({
+  slug: ProjectSlugSchema,
+  description: z.string(),
+  lane: z.string().optional(),
+  owner: OwnerSchema.optional(),
+  projectPath: z.string().optional(),
+  repositoryUrl: z.string().optional(),
+  createdAt: z.string(),
+  createdEventId: z.string(),
+  latestEventAt: z.string().optional(),
+  latestEventId: z.string().optional()
+});
+
+export type ProjectListItem = z.infer<typeof ProjectListItemSchema>;
+
+export const ProjectListResultSchema = z.object({
+  kind: z.literal("project-list-result"),
+  entryRoot: z.string(),
+  projects: z.array(ProjectListItemSchema),
+  humanOutputZh: z.string(),
+  humanSummaryZh: z.string()
+});
+
+export type ProjectListResult = z.infer<typeof ProjectListResultSchema>;
 
 export const ActivityQuerySchema = z.object({
   entryRoot: z.string().optional(),

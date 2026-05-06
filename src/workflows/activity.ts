@@ -26,9 +26,7 @@ export function appendActivity(input: {
     const fs = yield* FileSystem;
     const clock = yield* Clock;
     const now = yield* clock.now();
-    if (!(yield* fs.exists(config.entryRoot))) {
-      return yield* Effect.fail(new EntryWorkflowError("ENTRY_TARGET_MISSING", "entry 写入目标不存在。", { entryRoot: config.entryRoot }));
-    }
+    yield* fs.ensureDir(config.entryRoot);
     const parts = todayParts(now);
     const safeDevice = config.deviceName.replace(/[^a-zA-Z0-9._-]/g, "_");
     const eventFile = path.join(config.entryRoot, "activity", "events", safeDevice, parts.yyyy, parts.mm, `${parts.dd}.jsonl`);
@@ -40,7 +38,7 @@ export function appendActivity(input: {
       lane: input.lane,
       summary: input.summary,
       raw_ref: relativeToEntry(config, eventFile),
-      source: "entry activity append",
+      source: "foyer activity append",
       parents: [],
       data: {}
     };

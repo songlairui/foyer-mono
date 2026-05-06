@@ -18,9 +18,7 @@ export function appendInbox(input: {
     const clock = yield* Clock;
     const now = yield* clock.now();
 
-    if (!(yield* fs.exists(config.entryRoot))) {
-      return yield* Effect.fail(new EntryWorkflowError("ENTRY_TARGET_MISSING", "entry 写入目标不存在。", { entryRoot: config.entryRoot }));
-    }
+    yield* fs.ensureDir(config.entryRoot);
 
     const content = input.rawFile ? yield* fs.readFile(input.rawFile) : input.text ?? "";
     const parts = todayParts(now);

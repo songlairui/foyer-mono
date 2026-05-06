@@ -1,10 +1,10 @@
 {
   "name": "entry-init-project",
   "version": "1.0.0",
-  "description": "Entry 项目初始化 CLI、Effect workflow 与多宿主交付壳。",
+  "description": "Foyer 项目落户 CLI、Effect workflow 与多宿主交付壳。",
   "main": "dist/index.js",
   "bin": {
-    "entry": "dist/cli/index.js"
+    "foyer": "dist/cli/index.js"
   },
   "scripts": {
     "clean": "rm -rf dist",
@@ -16,6 +16,7 @@
     "test": "vitest run tests"
   },
   "keywords": [
+    "foyer",
     "entry",
     "cli",
     "effect",

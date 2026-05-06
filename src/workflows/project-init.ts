@@ -1,10 +1,15 @@
 import path from "node:path";
 import { Effect } from "effect";
 import {
+  ProjectListRequestSchema,
+  ProjectListResultSchema,
   ProjectInitPlanSchema,
   ProjectInitRequestSchema,
   ProjectInitResultSchema,
+  type ActivityEvent,
   type PlanStep,
+  type ProjectListItem,
+  type ProjectListResult,
   type ProjectInitPlan,
   type ProjectInitRequest,
   type ProjectInitResult
@@ -20,6 +25,7 @@ import {
   renderProjectReadme
 } from "../domain/render";
 import { Clock, FileSystem, Shell } from "../services/context";
+import { queryActivity } from "./activity";
 import { writeActivityFact } from "./activity-store";
 
 export function planProjectInit(input: unknown): Effect.Effect<ProjectInitPlan, EntryWorkflowError, Clock> {
@@ -41,7 +47,7 @@ export function planProjectInit(input: unknown): Effect.Effect<ProjectInitPlan, 
       projectPath: targetProjectPath,
       entryPaths: paths,
       steps,
-      warnings: request.createGithub ? [] : ["未启用 GitHub 创建；执行时只创建本地仓库和 entry 记录。"],
+      warnings: request.createGithub ? [] : ["未启用 GitHub 创建；执行时只创建本地仓库和 Foyer 记录。"],
       humanSummaryZh: `将初始化项目 ${request.slug}，目标目录为 ${targetProjectPath}。dry-run 不会产生副作用。`
     };
 
@@ -71,14 +77,6 @@ export function executeProjectInit(input: unknown): Effect.Effect<ProjectInitRes
       );
     }
 
-    if (!(yield* fs.exists(config.entryRoot))) {
-      return yield* Effect.fail(
-        new EntryWorkflowError("ENTRY_TARGET_MISSING", "entry 写入目标不存在。", {
-          entryRoot: config.entryRoot
-        })
-      );
-    }
-
     if (!(yield* shell.commandExists("git"))) {
       return yield* Effect.fail(new EntryWorkflowError("GIT_UNAVAILABLE", "未找到 git 命令。"));
     }
@@ -98,6 +96,7 @@ export function executeProjectInit(input: unknown): Effect.Effect<ProjectInitRes
       }
     }
 
+    yield* fs.ensureDir(config.entryRoot);
     yield* fs.ensureDir(path.join(targetProjectPath, "docs", "kickoff"));
     yield* fs.writeFile(path.join(targetProjectPath, "README.md"), renderProjectReadme(request));
     yield* fs.writeFile(path.join(targetProjectPath, "docs", "kickoff", ".gitkeep"), "");
@@ -123,8 +122,9 @@ export function executeProjectInit(input: unknown): Effect.Effect<ProjectInitRes
       config,
       summary: `创建项目 ${request.slug}：${request.description}`,
       rawRef,
-      source: "entry project init",
+      source: "foyer project init",
       data: {
+        description: request.description,
         projectPath: targetProjectPath,
         repositoryUrl
       },
@@ -154,7 +154,7 @@ export function executeProjectInit(input: unknown): Effect.Effect<ProjectInitRes
       },
       steps,
       activityEvent: event,
-      humanSummaryZh: `已创建项目 ${request.slug}，写入本地仓库、entry activity event 与 Markdown 视图。`
+      humanSummaryZh: `已创建项目 ${request.slug}，写入本地仓库、Foyer activity event 与 Markdown 视图。`
     };
 
     return ProjectInitResultSchema.parse(result);
@@ -194,9 +194,9 @@ function planSteps(request: ProjectInitRequest, targetProjectPath: string, event
       status: "planned"
     },
     {
-      id: "check-entry-root",
-      titleZh: "检查 entry 写入目标",
-      detailZh: `确认 activity event 可追加到 ${eventFile}。`,
+      id: "prepare-foyer-root",
+      titleZh: "准备 Foyer 数据根",
+      detailZh: `确认 activity event 可追加到 ${eventFile}，必要时创建 Foyer 子目录。`,
       effect: "check",
       status: "planned"
     },
@@ -217,7 +217,7 @@ function planSteps(request: ProjectInitRequest, targetProjectPath: string, event
     githubStep,
     {
       id: "append-activity-event",
-      titleZh: "追加 entry activity event",
+      titleZh: "追加 Foyer activity event",
       detailZh: "向 append-only JSONL 写入 project.created 事件。",
       effect: "write",
       status: "planned"
@@ -244,6 +244,92 @@ function upsertProjectIndexLine(indexPath: string, line: string): Effect.Effect<
     const next = [...prefix, ...filtered, line].join("\n") + "\n";
     yield* fs.writeFile(indexPath, next);
   });
+}
+
+export function listProjects(input: unknown): Effect.Effect<ProjectListResult, EntryWorkflowError, FileSystem> {
+  return Effect.gen(function* () {
+    const parsed = ProjectListRequestSchema.safeParse(input);
+    if (!parsed.success) return yield* Effect.fail(invalidInput(parsed.error));
+
+    const request = parsed.data;
+    const config = resolveConfig({ foyerRoot: request.foyerRoot, entryRoot: request.entryRoot });
+    const events = yield* queryActivity({
+      entryRoot: config.entryRoot,
+      limit: request.limit
+    });
+    const latestByProject = latestProjectEvents(events);
+    const items = new Map<string, ProjectListItem>();
+
+    for (const event of events) {
+      if (!event.project || (event.event !== "project.created" && event.event !== "project.initialized")) continue;
+      if (items.has(event.project)) continue;
+
+      const latest = latestByProject.get(event.project);
+      items.set(event.project, {
+        slug: event.project,
+        description: projectDescription(event),
+        lane: event.lane,
+        owner: event.owner,
+        projectPath: stringData(event, "projectPath"),
+        repositoryUrl: stringData(event, "repositoryUrl"),
+        createdAt: event.ts,
+        createdEventId: event.id,
+        latestEventAt: latest?.ts,
+        latestEventId: latest?.id
+      });
+    }
+
+    const projects = [...items.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || a.slug.localeCompare(b.slug));
+    const result: ProjectListResult = {
+      kind: "project-list-result",
+      entryRoot: config.entryRoot,
+      projects,
+      humanOutputZh: renderProjectList(projects),
+      humanSummaryZh: `已列出 ${projects.length} 个已启动项目。`
+    };
+
+    return ProjectListResultSchema.parse(result);
+  });
+}
+
+function latestProjectEvents(events: ActivityEvent[]): Map<string, ActivityEvent> {
+  const latest = new Map<string, ActivityEvent>();
+  for (const event of events) {
+    if (!event.project) continue;
+    const current = latest.get(event.project);
+    if (!current || event.ts > current.ts) latest.set(event.project, event);
+  }
+  return latest;
+}
+
+function projectDescription(event: ActivityEvent): string {
+  const structured = stringData(event, "description");
+  if (structured) return structured;
+  const prefix = event.project ? `创建项目 ${event.project}：` : "";
+  if (prefix && event.summary.startsWith(prefix)) return event.summary.slice(prefix.length);
+  return event.summary;
+}
+
+function stringData(event: ActivityEvent, key: string): string | undefined {
+  const value = event.data[key];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function renderProjectList(projects: ProjectListItem[]): string {
+  if (projects.length === 0) return "暂无已启动项目。\n";
+  return [
+    `已启动项目（${projects.length}）`,
+    ...projects.map((project) =>
+      [
+        `- ${project.slug} | ${project.lane ?? "-"} | ${project.owner ?? "-"} | ${project.createdAt}`,
+        `  ${project.description}`,
+        project.projectPath ? `  path: ${project.projectPath}` : undefined,
+        project.repositoryUrl ? `  repo: ${project.repositoryUrl}` : undefined
+      ]
+        .filter((line): line is string => Boolean(line))
+        .join("\n")
+    )
+  ].join("\n") + "\n";
 }
 
 export function upsertProjectIndex(input: {

@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { appendActivity, activityContext, exportActivity, queryActivity, searchActivity } from "../workflows/activity";
 import { runDoctor } from "../workflows/doctor";
 import { appendInbox } from "../workflows/inbox";
-import { executeProjectInit, planProjectInit, upsertProjectIndex } from "../workflows/project-init";
+import { executeProjectInit, listProjects, planProjectInit, upsertProjectIndex } from "../workflows/project-init";
 import { repoDevices, repoManifests, repoStatus } from "../workflows/repo";
 import { Clock, FileSystem, NodeServicesLive, Shell } from "../services/context";
 import { errorToJson, exitCodeFor } from "../domain/errors";
@@ -15,8 +15,8 @@ type OutputMode = { json?: boolean };
 const program = new Command();
 
 program
-  .name("entry")
-  .description("entry 项目初始化、activity 记录和派生导出 CLI")
+  .name("foyer")
+  .description("Foyer 项目落户、activity 记录和派生导出 CLI")
   .version("0.1.0");
 
 const project = program.command("project").description("项目初始化和索引命令");
@@ -26,10 +26,11 @@ project
   .argument("<slug>", "kebab-case 项目名")
   .description("初始化项目；支持 dry-run、稳定 JSON 输出和可恢复错误")
   .requiredOption("--desc <text>", "中文项目描述")
-  .option("--lane <lane>", "entry lane", "project")
+  .option("--lane <lane>", "项目 lane", "project")
   .option("--owner <owner>", "owner: me / wife / both", "me")
   .option("--projects-root <path>", "项目根目录")
-  .option("--entry-root <path>", "entry 根目录")
+  .option("--foyer-root <path>", "Foyer 数据根目录")
+  .option("--entry-root <path>", "兼容旧参数：旧数据根目录")
   .option("--github-owner <owner>", "GitHub owner")
   .option("--github-visibility <visibility>", "private / public / internal", "private")
   .option("--github", "创建 GitHub 仓库并 push", false)
@@ -42,7 +43,7 @@ project
       lane: options.lane,
       owner: options.owner,
       projectsRoot: options.projectsRoot,
-      entryRoot: options.entryRoot,
+      entryRoot: rootOption(options),
       githubOwner: options.githubOwner,
       githubVisibility: options.githubVisibility,
       createGithub: Boolean(options.github),
@@ -66,16 +67,28 @@ project
   });
 
 project
+  .command("list")
+  .option("--limit <n>", "最大返回数量", parseInteger, 1000)
+  .option("--foyer-root <path>", "Foyer 数据根目录")
+  .option("--entry-root <path>", "兼容旧参数：旧数据根目录")
+  .option("--json", "输出稳定 JSON")
+  .description("列出已经落户/启动过的项目")
+  .action(async (options) => {
+    await run(listProjects({ limit: options.limit, entryRoot: rootOption(options) }), options);
+  });
+
+project
   .command("upsert-index")
   .argument("<slug>", "项目名")
   .requiredOption("--desc <text>", "项目描述")
-  .option("--lane <lane>", "entry lane", "project")
+  .option("--lane <lane>", "项目 lane", "project")
   .option("--owner <owner>", "owner: me / wife / both", "me")
-  .option("--entry-root <path>", "entry 根目录")
+  .option("--foyer-root <path>", "Foyer 数据根目录")
+  .option("--entry-root <path>", "兼容旧参数：旧数据根目录")
   .option("--json", "输出稳定 JSON")
   .description("更新或生成 projects/index.md")
   .action(async (slug, options) => {
-    await run(upsertProjectIndex({ slug, description: options.desc, lane: options.lane, owner: options.owner, entryRoot: options.entryRoot }), options);
+    await run(upsertProjectIndex({ slug, description: options.desc, lane: options.lane, owner: options.owner, entryRoot: rootOption(options) }), options);
   });
 
 const inbox = program.command("inbox").description("inbox 追加命令");
@@ -85,11 +98,12 @@ inbox
   .requiredOption("--project <slug>", "项目名")
   .option("--raw-file <path>", "原始文本文件路径")
   .option("--text <text>", "直接追加的文本")
-  .option("--entry-root <path>", "entry 根目录")
+  .option("--foyer-root <path>", "Foyer 数据根目录")
+  .option("--entry-root <path>", "兼容旧参数：旧数据根目录")
   .option("--json", "输出稳定 JSON")
   .description("追加 inbox 记录，并写入 activity event")
   .action(async (options) => {
-    await run(appendInbox({ project: options.project, rawFile: options.rawFile, text: options.text, entryRoot: options.entryRoot }), options);
+    await run(appendInbox({ project: options.project, rawFile: options.rawFile, text: options.text, entryRoot: rootOption(options) }), options);
   });
 
 const activity = program.command("activity").description("activity event 查询、上下文和导出");
@@ -99,12 +113,13 @@ activity
   .requiredOption("--event <event>", "event 类型，例如 project.created")
   .option("--project <slug>", "项目名")
   .requiredOption("--summary <text>", "中文摘要")
-  .option("--lane <lane>", "entry lane")
-  .option("--entry-root <path>", "entry 根目录")
+  .option("--lane <lane>", "项目 lane")
+  .option("--foyer-root <path>", "Foyer 数据根目录")
+  .option("--entry-root <path>", "兼容旧参数：旧数据根目录")
   .option("--json", "输出稳定 JSON")
   .description("追加 machine-readable activity event")
   .action(async (options) => {
-    await run(appendActivity({ event: options.event, project: options.project, summary: options.summary, lane: options.lane, entryRoot: options.entryRoot }), options);
+    await run(appendActivity({ event: options.event, project: options.project, summary: options.summary, lane: options.lane, entryRoot: rootOption(options) }), options);
   });
 
 activity
@@ -113,11 +128,12 @@ activity
   .option("--event <event>", "event 类型")
   .option("--since <iso>", "ISO 起始时间")
   .option("--limit <n>", "最大返回数量", parseInteger, 100)
-  .option("--entry-root <path>", "entry 根目录")
+  .option("--foyer-root <path>", "Foyer 数据根目录")
+  .option("--entry-root <path>", "兼容旧参数：旧数据根目录")
   .option("--json", "输出稳定 JSON")
   .description("通过 CLI 查询 activity event；agent 不应直接读取 raw jsonl")
   .action(async (options) => {
-    await run(queryActivity({ project: options.project, event: options.event, since: options.since, limit: options.limit, entryRoot: options.entryRoot }), options);
+    await run(queryActivity({ project: options.project, event: options.event, since: options.since, limit: options.limit, entryRoot: rootOption(options) }), options);
   });
 
 activity
@@ -125,11 +141,12 @@ activity
   .requiredOption("--project <slug>", "项目名")
   .option("--budget <n>", "上下文预算，按字符近似裁剪", parseInteger, 6000)
   .option("--format <format>", "markdown / json", "markdown")
-  .option("--entry-root <path>", "entry 根目录")
+  .option("--foyer-root <path>", "Foyer 数据根目录")
+  .option("--entry-root <path>", "兼容旧参数：旧数据根目录")
   .option("--json", "输出稳定 JSON")
   .description("生成低上下文项目材料")
   .action(async (options) => {
-    await run(activityContext({ project: options.project, budget: options.budget, format: options.format, entryRoot: options.entryRoot }), options);
+    await run(activityContext({ project: options.project, budget: options.budget, format: options.format, entryRoot: rootOption(options) }), options);
   });
 
 activity
@@ -137,11 +154,12 @@ activity
   .requiredOption("--scope <scope>", "project:<slug> 或 all-projects")
   .requiredOption("--target <target>", "graphify-corpus / hyperextract-input / hyperextract-ka / fts-index")
   .option("--out <path>", "输出路径")
-  .option("--entry-root <path>", "entry 根目录")
+  .option("--foyer-root <path>", "Foyer 数据根目录")
+  .option("--entry-root <path>", "兼容旧参数：旧数据根目录")
   .option("--json", "输出稳定 JSON")
   .description("导出可重建派生物，不能回写为事实源")
   .action(async (options) => {
-    await run(exportActivity({ scope: options.scope, target: options.target, out: options.out, entryRoot: options.entryRoot }), options);
+    await run(exportActivity({ scope: options.scope, target: options.target, out: options.out, entryRoot: rootOption(options) }), options);
   });
 
 const repo = program.command("repo").description("设备和仓库状态查询");
@@ -167,23 +185,25 @@ repo
 
 repo
   .command("manifests")
-  .option("--entry-root <path>", "entry 根目录")
+  .option("--foyer-root <path>", "Foyer 数据根目录")
+  .option("--entry-root <path>", "兼容旧参数：旧数据根目录")
   .option("--json", "输出稳定 JSON")
   .description("通过 CLI 扫描 activity/manifests，供跨设备拼接使用")
   .action(async (options) => {
-    await run(repoManifests({ entryRoot: options.entryRoot }), options);
+    await run(repoManifests({ entryRoot: rootOption(options) }), options);
   });
 
 program
   .command("doctor")
-  .option("--entry-root <path>", "entry 根目录")
+  .option("--foyer-root <path>", "Foyer 数据根目录")
+  .option("--entry-root <path>", "兼容旧参数：旧数据根目录")
   .option("--projects-root <path>", "项目根目录")
   .option("--project <slug>", "只查看某个项目的 activity event")
   .option("--limit <n>", "最近事件数量", parseInteger, 10)
   .option("--json", "输出稳定 JSON")
-  .description("只读 dashboard：列出 entry 历史数据、sidecar、视图、派生物和本地仓库状态")
+  .description("只读 dashboard：列出 Foyer 历史数据、sidecar、视图、派生物和本地仓库状态")
   .action(async (options) => {
-    await run(runDoctor({ entryRoot: options.entryRoot, projectsRoot: options.projectsRoot, project: options.project, limit: options.limit }), options);
+    await run(runDoctor({ entryRoot: rootOption(options), projectsRoot: options.projectsRoot, project: options.project, limit: options.limit }), options);
   });
 
 program
@@ -191,11 +211,12 @@ program
   .argument("<query>", "搜索词")
   .option("--project <slug>", "项目名")
   .option("--limit <n>", "最大返回数量", parseInteger, 10)
-  .option("--entry-root <path>", "entry 根目录")
+  .option("--foyer-root <path>", "Foyer 数据根目录")
+  .option("--entry-root <path>", "兼容旧参数：旧数据根目录")
   .option("--json", "输出稳定 JSON")
   .description("等价本地搜索派生层查询，返回精确引用")
   .action(async (query, options) => {
-    await run(searchActivity({ query, project: options.project, limit: options.limit, entryRoot: options.entryRoot }), options);
+    await run(searchActivity({ query, project: options.project, limit: options.limit, entryRoot: rootOption(options) }), options);
   });
 
 program.parseAsync(process.argv).catch((error) => {
@@ -232,10 +253,18 @@ function writeSuccess(value: unknown, options: OutputMode): void {
     process.stdout.write(value);
     return;
   }
+  if (typeof value === "object" && value && "humanOutputZh" in value) {
+    process.stdout.write(String((value as { humanOutputZh: unknown }).humanOutputZh));
+    return;
+  }
   const humanSummaryZh = typeof value === "object" && value && "humanSummaryZh" in value ? String((value as { humanSummaryZh: unknown }).humanSummaryZh) : "命令执行完成。";
   process.stdout.write(`${humanSummaryZh}\n`);
 }
 
 function parseInteger(value: string): number {
   return Number.parseInt(value, 10);
+}
+
+function rootOption(options: { foyerRoot?: string; entryRoot?: string }): string | undefined {
+  return options.foyerRoot ?? options.entryRoot;
 }

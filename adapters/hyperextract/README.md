@@ -3,7 +3,7 @@
 导出输入：
 
 ```bash
-entry activity export --scope project:<slug> --target hyperextract-input --json
+foyer activity export --scope project:<slug> --target hyperextract-input --json
 ```
 
 导出的 Markdown 带有模板提示：
@@ -18,5 +18,5 @@ language: zh
 在没有 `he` CLI 的环境里，可以先生成最小 Knowledge Abstract 派生物：
 
 ```bash
-entry activity export --scope project:<slug> --target hyperextract-ka --json
+foyer activity export --scope project:<slug> --target hyperextract-ka --json
 ```

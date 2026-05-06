@@ -9,7 +9,7 @@ export interface ProjectInitCommandInput {
   dryRun?: boolean;
 }
 
-export function runEntryProjectInit(input: ProjectInitCommandInput) {
+export function runFoyerProjectInit(input: ProjectInitCommandInput) {
   const args = [
     "project",
     "init",
@@ -26,7 +26,7 @@ export function runEntryProjectInit(input: ProjectInitCommandInput) {
   if (input.github) args.push("--github");
   if (input.dryRun ?? true) args.push("--dry-run");
 
-  const result = spawnSync("entry", args, {
+  const result = spawnSync("foyer", args, {
     encoding: "utf8"
   });
 

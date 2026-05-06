@@ -1,6 +1,6 @@
 {
   "entryInitProject": {
-    "cli": "entry",
+    "cli": "foyer",
     "dryRunFirst": true
   }
 }

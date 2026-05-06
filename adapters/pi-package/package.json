@@ -1,7 +1,7 @@
 {
   "name": "@entry/init-project-pi",
   "version": "0.1.0",
-  "description": "Pi package：通过 entry CLI 初始化项目并登记 entry。",
+  "description": "Pi package：通过 foyer CLI 初始化项目并登记 Foyer。",
   "type": "module",
   "private": true,
   "scripts": {

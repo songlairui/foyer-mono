@@ -16,7 +16,7 @@ export interface ProjectInitPayload {
 }
 
 export function plan(payload: ProjectInitPayload) {
-  return runEntry(payload, true);
+  return runFoyer(payload, true);
 }
 
 export function execute(payload: ProjectInitPayload) {
@@ -27,7 +27,7 @@ export function execute(payload: ProjectInitPayload) {
       messageZh: "执行项目初始化前需要确认。请先查看 dry-run 计划。"
     };
   }
-  return runEntry(payload, false);
+  return runFoyer(payload, false);
 }
 
 export default async function ({ payload }: FlueContext) {
@@ -35,7 +35,7 @@ export default async function ({ payload }: FlueContext) {
   return request.confirm ? execute(request) : plan(request);
 }
 
-function runEntry(payload: ProjectInitPayload, dryRun: boolean) {
+function runFoyer(payload: ProjectInitPayload, dryRun: boolean) {
   const args = [
     "project",
     "init",
@@ -52,7 +52,7 @@ function runEntry(payload: ProjectInitPayload, dryRun: boolean) {
   if (payload.github) args.push("--github");
   if (dryRun) args.push("--dry-run");
 
-  const cli = process.env.ENTRY_INIT_PROJECT_CLI ?? "entry";
+  const cli = process.env.FOYER_CLI ?? process.env.ENTRY_INIT_PROJECT_CLI ?? "foyer";
   const command = cli.endsWith(".js") ? process.execPath : cli;
   const finalArgs = cli.endsWith(".js") ? [cli, ...args] : args;
   const result = spawnSync(command, finalArgs, { encoding: "utf8" });

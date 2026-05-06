@@ -3,23 +3,24 @@
 ## 稳定入口
 
 ```bash
-entry project init <slug> --desc <text> --dry-run --json
-entry project init <slug> --desc <text> --json
-entry project plan --input request.json --json
-entry inbox append --project <slug> --raw-file <path> --json
-entry project upsert-index <slug> --desc <text> --json
-entry activity append --event project.created --project <slug> --summary <text> --json
-entry activity query --project <slug> --json
-entry activity context --project <slug> --budget 6000 --format markdown
-entry activity export --scope project:<slug> --target graphify-corpus
-entry activity export --scope project:<slug> --target hyperextract-input
-entry activity export --scope project:<slug> --target hyperextract-ka
-entry repo devices --json
-entry repo status --all --json
-entry repo manifests --json
-entry doctor --json
-entry doctor --project <slug> --json
-entry search "<query>" --project <slug> --json
+foyer project init <slug> --desc <text> --dry-run --json
+foyer project init <slug> --desc <text> --json
+foyer project plan --input request.json --json
+foyer project list --json
+foyer inbox append --project <slug> --raw-file <path> --json
+foyer project upsert-index <slug> --desc <text> --json
+foyer activity append --event project.created --project <slug> --summary <text> --json
+foyer activity query --project <slug> --json
+foyer activity context --project <slug> --budget 6000 --format markdown
+foyer activity export --scope project:<slug> --target graphify-corpus
+foyer activity export --scope project:<slug> --target hyperextract-input
+foyer activity export --scope project:<slug> --target hyperextract-ka
+foyer repo devices --json
+foyer repo status --all --json
+foyer repo manifests --json
+foyer doctor --json
+foyer doctor --project <slug> --json
+foyer search "<query>" --project <slug> --json
 ```
 
 ## 输出规则

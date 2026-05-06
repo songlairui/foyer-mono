@@ -12,7 +12,7 @@
 6. 使用 `gh repo create` 创建同名私有仓库。
 7. 提交 README 和 `docs/kickoff/.gitkeep`。
 8. push 到 GitHub。
-9. 把过程记录回 `~/entry`。
+9. 把过程记录回 `~/.foyer`。
 
 ## 抽取原则
 
