@@ -55,4 +55,4 @@
 - sandbox/filesystem 权限应是 harness 设计的一部分。
 - token 和 secret 应留在受控 shell/API 调用之外，不进入模型上下文。
 
-本仓库只把 Flue 作为薄适配壳。核心流程仍在 `src/workflows` 和 `src/cli`。
+本仓库只把 Flue 作为薄适配壳。核心流程仍在 `packages/cli/src/workflows` 和 `packages/cli/src/cli`。

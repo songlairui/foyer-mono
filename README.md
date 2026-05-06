@@ -4,7 +4,7 @@
 
 对外命令名是 `foyer`。Foyer 的意象是“落户”：用户不需要操心新建文件夹、子文件夹、历史记录和索引应该放在哪里，只要描述要开始什么，CLI 负责把项目安顿到本机项目空间和 `~/.foyer` 数据根里。
 
-核心边界是 `foyer` CLI。当前推荐入口是 CLI 和瘦身版 skill；Claude Code plugin、Pi package/extension 和 Flue agent 先保留为调研与未来交付边界，不作为当前必要安装项。
+本仓库现在是 pnpm monorepo。核心边界是 `packages/cli` 里的 `foyer` CLI；根目录的 docs、skills、adapters 和 `.flue/` 保持为全局资料与薄适配层，后续可以在 `packages/*` 或 `apps/*` 继续添加其他输出页面。
 
 ## 当前能力
 
@@ -21,7 +21,7 @@
 
 ### 安装 CLI
 
-CLI 通过 npm 包分发。当前 `package.json` 的包名仍是 `entry-init-project`，二进制命令名是 `foyer`。发布到 npm 后，用户可以全局安装：
+CLI 通过 npm 包分发。当前 `packages/cli/package.json` 的包名仍是 `entry-init-project`，二进制命令名是 `foyer`。发布到 npm 后，用户可以全局安装：
 
 ```bash
 npm install -g entry-init-project
@@ -43,9 +43,9 @@ pnpm check
 pnpm test
 pnpm build
 npm whoami
-pnpm pack --dry-run
-pnpm publish --dry-run
-pnpm publish
+pnpm --dir packages/cli pack --dry-run
+pnpm --dir packages/cli publish --dry-run
+pnpm --dir packages/cli publish
 ```
 
 如果未来把包名改成 scoped package，例如 `@<scope>/entry-init-project`，首次公开发布时使用：
@@ -75,7 +75,7 @@ python ~/.codex/skills/.system/skill-installer/scripts/install-skill-from-github
 ```bash
 pnpm install
 pnpm build
-pnpm link --global
+pnpm --dir packages/cli link --global
 foyer --help
 ```
 
@@ -166,18 +166,23 @@ pnpm cli project init demo-project --desc "用于验证 Foyer 初始化流程" -
 
 ```bash
 pnpm build
-node dist/cli/index.js project init demo-project --desc "用于验证 Foyer 初始化流程" --dry-run --json
+node packages/cli/dist/cli/index.js project init demo-project --desc "用于验证 Foyer 初始化流程" --dry-run --json
 ```
 
 ## 目录
 
 ```text
 entry-init-project/
-  src/
-    domain/       # contract、错误、路径和渲染
-    services/     # Effect Context/Layer：文件系统、shell、clock
-    workflows/    # project init、activity、inbox、repo
-    cli/          # foyer CLI
+  package.json
+  pnpm-workspace.yaml
+  packages/
+    cli/
+      src/
+        domain/       # contract、错误、路径和渲染
+        services/     # Effect Context/Layer：文件系统、shell、clock
+        workflows/    # project init、activity、inbox、repo
+        cli/          # foyer CLI
+      tests/          # CLI workflow tests
   skills/         # 瘦身版 init-project skill
   adapters/       # 宿主交付调研；当前推荐直接用 CLI + skill
   .flue/          # Flue agent 薄适配壳

@@ -3,7 +3,7 @@
 当前 `.flue` 目录保持薄适配：
 
 ```bash
-ENTRY_INIT_PROJECT_CLI=./dist/cli/index.js pnpm exec flue run project-init \
+ENTRY_INIT_PROJECT_CLI=packages/cli/dist/cli/index.js pnpm exec flue run project-init \
   --target node \
   --output .flue-dist \
   --id demo \

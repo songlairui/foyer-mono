@@ -7,4 +7,4 @@
 - 实际执行通过 `foyer project init --dry-run --json` 和 `foyer project init --json`。
 - `pnpm exec flue run project-init --target node --output .flue-dist --id <id> --payload <json>` 可作为 Flue CLI 触发入口。
 
-如果未来接入真实 `flue run`、Node HTTP endpoint 或远端部署，仍应保持核心 workflow 在 `src/workflows`。
+如果未来接入真实 `flue run`、Node HTTP endpoint 或远端部署，仍应保持核心 workflow 在 `packages/cli/src/workflows`。

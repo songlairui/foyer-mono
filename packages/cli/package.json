@@ -1,0 +1,36 @@
+{
+  "name": "entry-init-project",
+  "version": "1.0.0",
+  "description": "Foyer 项目落户 CLI 与 Effect workflows。",
+  "main": "dist/index.js",
+  "bin": {
+    "foyer": "dist/cli/index.js"
+  },
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "pnpm run clean && tsc -p tsconfig.build.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "cli": "tsx src/cli/index.ts",
+    "test": "vitest run tests"
+  },
+  "keywords": [
+    "foyer",
+    "entry",
+    "cli",
+    "effect",
+    "project-init"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "commander": "^14.0.3",
+    "effect": "^3.21.2",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.5"
+  }
+}

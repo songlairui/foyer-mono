@@ -182,11 +182,13 @@ activity/derived/
 
 ```text
 entry-init-project/
-  src/
-    domain/
-    workflows/
-    services/
+  packages/
     cli/
+      src/
+        domain/
+        workflows/
+        services/
+        cli/
   adapters/
     skills/
     claude-code-plugin/
