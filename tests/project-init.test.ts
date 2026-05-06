@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { Effect, Layer } from "effect";
@@ -126,6 +126,45 @@ describe("project init workflow", () => {
     expect(result.projects.map((project) => project.slug)).toEqual(["alpha-project", "beta-project"]);
     expect(result.projects[0]?.description).toBe("第一个落户项目");
     expect(result.humanOutputZh).toContain("已启动项目（2）");
+  });
+
+  it("lists legacy project.created facts without using markdown indexes as source", async () => {
+    const root = await tempRoot();
+    const entryRoot = path.join(root, "entry");
+    const eventsDir = path.join(entryRoot, "activity", "events", "legacy-device", "2026", "05");
+    await mkdir(eventsDir, { recursive: true });
+    await writeFile(
+      path.join(eventsDir, "01.jsonl"),
+      `${JSON.stringify({
+        id: "20260501T000000+0800-legacy-0001",
+        device: "legacy-device",
+        seq: 1,
+        ts: "2026-05-01T00:00:00+08:00",
+        source: "codex",
+        actor: "assistant",
+        event: "project.created",
+        lane: "legacy_lane",
+        summary: "用户发起 legacy-project：旧格式 project.created 事实。",
+        raw_ref: "inbox/2026/05/2026-05-01.md",
+        project_ref: "projects/legacy-project.md",
+        artifacts: [path.join(root, "projects", "legacy-project"), "https://github.com/example/legacy-project"],
+        metadata: {
+          project_name: "legacy-project",
+          local_path: path.join(root, "projects", "legacy-project"),
+          github_url: "https://github.com/example/legacy-project"
+        }
+      })}\n`,
+      "utf8"
+    );
+    await mkdir(path.join(entryRoot, "projects"), { recursive: true });
+    await writeFile(path.join(entryRoot, "projects", "index.md"), "- [ignored-index-only](ignored-index-only.md) - 不应作为事实源\n", "utf8");
+
+    const result = await runWithServices(listProjects({ entryRoot }));
+
+    expect(result.projects.map((project) => project.slug)).toEqual(["legacy-project"]);
+    expect(result.projects[0]?.lane).toBe("legacy_lane");
+    expect(result.projects[0]?.projectPath).toBe(path.join(root, "projects", "legacy-project"));
+    expect(result.projects[0]?.repositoryUrl).toBe("https://github.com/example/legacy-project");
   });
 
   it("fails when target directory already exists", async () => {

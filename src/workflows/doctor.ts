@@ -1,9 +1,10 @@
 import path from "node:path";
 import { Effect } from "effect";
-import { ActivityEventSchema, type ActivityEvent } from "../domain/contracts";
+import type { ActivityEvent } from "../domain/contracts";
 import type { EntryWorkflowError } from "../domain/errors";
 import { resolveConfig } from "../domain/paths";
 import { FileSystem, Shell } from "../services/context";
+import { parseActivityEvent } from "./activity";
 import { repoDevices, repoStatus } from "./repo";
 
 export interface DoctorReport {
@@ -73,13 +74,13 @@ export function runDoctor(input: {
       for (const line of content.split(/\r?\n/)) {
         if (!line.trim()) continue;
         try {
-          const parsed = ActivityEventSchema.safeParse(JSON.parse(line));
-          if (!parsed.success) {
+          const parsed = parseActivityEvent(JSON.parse(line));
+          if (!parsed) {
             malformedEventLines += 1;
             continue;
           }
-          if (!input.project || parsed.data.project === input.project) {
-            events.push(parsed.data);
+          if (!input.project || parsed.project === input.project) {
+            events.push(parsed);
           }
         } catch {
           malformedEventLines += 1;

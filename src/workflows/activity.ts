@@ -79,17 +79,82 @@ export function queryActivity(input: unknown): Effect.Effect<ActivityEvent[], En
         } catch {
           continue;
         }
-        const event = ActivityEventSchema.safeParse(raw);
-        if (!event.success) continue;
-        if (query.project && event.data.project !== query.project) continue;
-        if (query.event && event.data.event !== query.event) continue;
-        if (query.since && event.data.ts < query.since) continue;
-        events.push(event.data);
+        const event = parseActivityEvent(raw);
+        if (!event) continue;
+        if (query.project && event.project !== query.project) continue;
+        if (query.event && event.event !== query.event) continue;
+        if (query.since && event.ts < query.since) continue;
+        events.push(event);
       }
     }
 
     return events.sort((a, b) => a.ts.localeCompare(b.ts)).slice(-query.limit);
   });
+}
+
+export function parseActivityEvent(raw: unknown): ActivityEvent | undefined {
+  const strict = ActivityEventSchema.safeParse(raw);
+  if (strict.success) return strict.data;
+
+  if (!isRecord(raw)) return undefined;
+  const id = stringValue(raw.id);
+  const ts = stringValue(raw.ts);
+  const device = stringValue(raw.device);
+  const event = stringValue(raw.event);
+  const summary = stringValue(raw.summary);
+  if (!id || !ts || !device || !event || !summary) return undefined;
+
+  const data = recordValue(raw.data);
+  const metadata = recordValue(raw.metadata);
+  const project = stringValue(raw.project) ?? stringValue(metadata?.project_name) ?? projectFromRef(stringValue(raw.project_ref));
+  const artifacts = Array.isArray(raw.artifacts) ? raw.artifacts : [];
+  const projectPath = stringValue(data?.projectPath) ?? stringValue(metadata?.local_path) ?? artifacts.find((artifact): artifact is string => typeof artifact === "string" && artifact.startsWith("/"));
+  const repositoryUrl = stringValue(data?.repositoryUrl) ?? stringValue(metadata?.github_url) ?? artifacts.find((artifact): artifact is string => typeof artifact === "string" && /^https?:\/\//.test(artifact));
+
+  const normalized = ActivityEventSchema.safeParse({
+    id,
+    ts,
+    device,
+    event,
+    project,
+    lane: stringValue(raw.lane),
+    owner: ownerValue(raw.owner),
+    summary,
+    raw_ref: stringValue(raw.raw_ref),
+    source: stringValue(raw.source),
+    parents: Array.isArray(raw.parents) ? raw.parents.filter((parent): parent is string => typeof parent === "string") : [],
+    data: {
+      ...(data ?? {}),
+      ...(projectPath ? { projectPath } : {}),
+      ...(repositoryUrl ? { repositoryUrl } : {}),
+      ...(metadata ? { legacyMetadata: metadata } : {})
+    },
+    hash: stringValue(raw.hash) ?? `sha256:${hashObject(raw)}`
+  });
+
+  return normalized.success ? normalized.data : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function recordValue(value: unknown): Record<string, unknown> | undefined {
+  return isRecord(value) ? value : undefined;
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function ownerValue(value: unknown): ActivityEvent["owner"] | undefined {
+  return value === "me" || value === "wife" || value === "both" ? value : undefined;
+}
+
+function projectFromRef(ref: string | undefined): string | undefined {
+  if (!ref) return undefined;
+  const basename = path.basename(ref);
+  return basename.endsWith(".md") ? basename.slice(0, -".md".length) : basename || undefined;
 }
 
 export function activityContext(input: {
