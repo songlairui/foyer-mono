@@ -3,15 +3,17 @@ import { Clock, Shell, type CommandResult, type ShellService } from "./context";
 
 export function fixedClock(date: Date) {
   return Layer.succeed(Clock, {
-    now: () => Effect.succeed(date)
+    now: () => Effect.succeed(date),
   });
 }
 
-export function fakeShell(options: {
-  missing?: readonly string[];
-  failCommands?: Record<string, { exitCode: number; stderr: string }>;
-  onRun?: (command: string, args: readonly string[], cwd?: string) => void;
-} = {}) {
+export function fakeShell(
+  options: {
+    missing?: readonly string[];
+    failCommands?: Record<string, { exitCode: number; stderr: string }>;
+    onRun?: (command: string, args: readonly string[], cwd?: string) => void;
+  } = {},
+) {
   const service: ShellService = {
     commandExists: (command) => Effect.succeed(!(options.missing ?? []).includes(command)),
     run: (command, args, runOptions) =>
@@ -27,7 +29,7 @@ export function fakeShell(options: {
           ? { exitCode: failure.exitCode, stdout: "", stderr: failure.stderr }
           : { exitCode: 0, stdout: "", stderr: "" };
         return result;
-      })
+      }),
   };
 
   return Layer.succeed(Shell, service);

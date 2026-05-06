@@ -2,7 +2,6 @@
   "name": "foyer-mono",
   "private": true,
   "description": "Foyer monorepo：当前承载 foyer CLI，后续可增加其他输出页面包。",
-  "packageManager": "pnpm@10.33.2",
   "scripts": {
     "clean": "pnpm -r --if-present clean && rm -rf .flue-dist",
     "build": "pnpm -r --if-present build",
@@ -10,13 +9,16 @@
     "cli": "pnpm --dir packages/cli cli",
     "test": "pnpm -r --if-present test",
     "flue:dev": "flue dev --target node --output .flue-dist",
-    "flue:run": "flue run project-init --target node --output .flue-dist"
+    "flue:run": "flue run project-init --target node --output .flue-dist",
+    "prepare": "vp config"
   },
   "devDependencies": {
     "@flue/cli": "^0.3.10",
     "@flue/sdk": "^0.3.10",
     "@types/node": "^25.6.0",
     "tsx": "^4.21.0",
-    "typescript": "^6.0.3"
-  }
+    "typescript": "^6.0.3",
+    "vite-plus": "catalog:"
+  },
+  "packageManager": "pnpm@10.33.2"
 }

@@ -22,7 +22,9 @@ export interface DoctorReport {
     malformedEventLines: number;
     eventTypes: Record<string, number>;
     projects: string[];
-    recentEvents: Array<Pick<ActivityEvent, "id" | "ts" | "event" | "project" | "summary" | "raw_ref">>;
+    recentEvents: Array<
+      Pick<ActivityEvent, "id" | "ts" | "event" | "project" | "summary" | "raw_ref">
+    >;
   };
   sidecars: {
     nodes: number;
@@ -65,7 +67,9 @@ export function runDoctor(input: {
     if (!projectsRootExists) warnings.push(`projects 根目录不存在：${config.projectsRoot}`);
 
     const eventsRoot = path.join(config.entryRoot, "activity", "events");
-    const eventFiles = (yield* listFilesIfExists(eventsRoot)).filter((file) => file.endsWith(".jsonl")).sort();
+    const eventFiles = (yield* listFilesIfExists(eventsRoot))
+      .filter((file) => file.endsWith(".jsonl"))
+      .sort();
     const events: ActivityEvent[] = [];
     let malformedEventLines = 0;
 
@@ -89,26 +93,50 @@ export function runDoctor(input: {
     }
 
     const projectPages = (yield* listFilesIfExists(path.join(config.entryRoot, "projects"))).filter(
-      (file) => file.endsWith(".md") && path.basename(file) !== "index.md"
+      (file) => file.endsWith(".md") && path.basename(file) !== "index.md",
     );
-    const inboxFiles = (yield* listFilesIfExists(path.join(config.entryRoot, "inbox"))).filter((file) => file.endsWith(".md"));
-    const nodes = (yield* listFilesIfExists(path.join(config.entryRoot, "activity", "nodes"))).filter((file) => file.endsWith(".json"));
-    const frontiers = (yield* listFilesIfExists(path.join(config.entryRoot, "activity", "frontier"))).filter((file) => file.endsWith(".json"));
-    const manifests = (yield* listFilesIfExists(path.join(config.entryRoot, "activity", "manifests"))).filter((file) => file.endsWith(".json"));
-    const derivedFiles = yield* listFilesIfExists(path.join(config.entryRoot, "activity", "derived"));
-    const cursors = derivedFiles.filter((file) => file.includes(`${path.sep}cursors${path.sep}`) && file.endsWith(".json"));
+    const inboxFiles = (yield* listFilesIfExists(path.join(config.entryRoot, "inbox"))).filter(
+      (file) => file.endsWith(".md"),
+    );
+    const nodes = (yield* listFilesIfExists(
+      path.join(config.entryRoot, "activity", "nodes"),
+    )).filter((file) => file.endsWith(".json"));
+    const frontiers = (yield* listFilesIfExists(
+      path.join(config.entryRoot, "activity", "frontier"),
+    )).filter((file) => file.endsWith(".json"));
+    const manifests = (yield* listFilesIfExists(
+      path.join(config.entryRoot, "activity", "manifests"),
+    )).filter((file) => file.endsWith(".json"));
+    const derivedFiles = yield* listFilesIfExists(
+      path.join(config.entryRoot, "activity", "derived"),
+    );
+    const cursors = derivedFiles.filter(
+      (file) => file.includes(`${path.sep}cursors${path.sep}`) && file.endsWith(".json"),
+    );
     const projectIndex = path.join(config.entryRoot, "projects", "index.md");
 
-    const repos = projectsRootExists ? yield* repoDevices({ projectsRoot: config.projectsRoot, deviceName: config.deviceName }) : [];
+    const repos = projectsRootExists
+      ? yield* repoDevices({ projectsRoot: config.projectsRoot, deviceName: config.deviceName })
+      : [];
     let statuses: Array<{ repo: string; path: string; dirty: boolean; status: string }> = [];
     if (projectsRootExists && (yield* shell.commandExists("git"))) {
-      statuses = yield* repoStatus({ projectsRoot: config.projectsRoot, all: true, deviceName: config.deviceName });
+      statuses = yield* repoStatus({
+        projectsRoot: config.projectsRoot,
+        all: true,
+        deviceName: config.deviceName,
+      });
     } else if (projectsRootExists) {
       warnings.push("未找到 git，doctor 只列出仓库路径，不检查 dirty 状态。");
     }
 
     const eventTypes = countBy(events, (event) => event.event);
-    const projects = [...new Set(events.map((event) => event.project).filter((project): project is string => Boolean(project)))].sort();
+    const projects = [
+      ...new Set(
+        events
+          .map((event) => event.project)
+          .filter((project): project is string => Boolean(project)),
+      ),
+    ].sort();
     const recentEvents = events
       .sort((a, b) => b.ts.localeCompare(a.ts))
       .slice(0, input.limit ?? 10)
@@ -118,13 +146,17 @@ export function runDoctor(input: {
         event: event.event,
         project: event.project,
         summary: event.summary,
-        raw_ref: event.raw_ref
+        raw_ref: event.raw_ref,
       }));
 
-    if (malformedEventLines > 0) warnings.push(`发现 ${malformedEventLines} 行 activity event 无法解析。`);
-    if (events.length > 0 && nodes.length === 0) warnings.push("存在 activity event，但没有 activity/nodes sidecar。");
-    if (events.length > 0 && manifests.length === 0) warnings.push("存在 activity event，但没有 manifest sidecar。");
-    if (events.length > 0 && frontiers.length === 0) warnings.push("存在 activity event，但没有 frontier sidecar。");
+    if (malformedEventLines > 0)
+      warnings.push(`发现 ${malformedEventLines} 行 activity event 无法解析。`);
+    if (events.length > 0 && nodes.length === 0)
+      warnings.push("存在 activity event，但没有 activity/nodes sidecar。");
+    if (events.length > 0 && manifests.length === 0)
+      warnings.push("存在 activity event，但没有 manifest sidecar。");
+    if (events.length > 0 && frontiers.length === 0)
+      warnings.push("存在 activity event，但没有 frontier sidecar。");
 
     return {
       kind: "entry-doctor-report",
@@ -133,7 +165,7 @@ export function runDoctor(input: {
         entryRoot: config.entryRoot,
         entryRootExists,
         projectsRoot: config.projectsRoot,
-        projectsRootExists
+        projectsRootExists,
       },
       facts: {
         eventFiles: eventFiles.length,
@@ -141,29 +173,29 @@ export function runDoctor(input: {
         malformedEventLines,
         eventTypes,
         projects,
-        recentEvents
+        recentEvents,
       },
       sidecars: {
         nodes: nodes.length,
         frontiers: frontiers.length,
-        manifests: manifests.length
+        manifests: manifests.length,
       },
       views: {
         projectPages: projectPages.length,
         hasProjectIndex: yield* fs.exists(projectIndex),
-        inboxFiles: inboxFiles.length
+        inboxFiles: inboxFiles.length,
       },
       derived: {
         files: derivedFiles.length,
-        cursors: cursors.length
+        cursors: cursors.length,
       },
       repositories: {
         localRepos: repos.length,
         dirtyRepos: statuses.filter((status) => status.dirty).length,
-        statuses
+        statuses,
       },
       warnings,
-      humanSummaryZh: `doctor 完成：${events.length} 条 activity event，${projectPages.length} 个项目页，${repos.length} 个本地仓库，${warnings.length} 个提示。`
+      humanSummaryZh: `doctor 完成：${events.length} 条 activity event，${projectPages.length} 个项目页，${repos.length} 个本地仓库，${warnings.length} 个提示。`,
     };
   });
 }

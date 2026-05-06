@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { Effect, Layer } from "effect";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vite-plus/test";
 import { EntryWorkflowError, errorToJson } from "../src/domain/errors";
 import { Clock, FileSystem, NodeFileSystemLive, Shell } from "../src/services/context";
 import { fakeShell, fixedClock } from "../src/services/test-context";
@@ -27,8 +27,8 @@ describe("project init workflow", () => {
         description: "用于验证 dry-run 的项目",
         projectsRoot: path.join(root, "projects"),
         entryRoot,
-        dryRun: true
-      }).pipe(Effect.provide(fixedClock(new Date("2026-05-05T12:00:00.000Z"))))
+        dryRun: true,
+      }).pipe(Effect.provide(fixedClock(new Date("2026-05-05T12:00:00.000Z")))),
     );
 
     expect(plan.kind).toBe("project-init-plan");
@@ -40,7 +40,7 @@ describe("project init workflow", () => {
       "git-init",
       "github-create",
       "append-activity-event",
-      "update-markdown-views"
+      "update-markdown-views",
     ]);
     expect(plan.projectPath).toContain("demo-project");
   });
@@ -56,16 +56,24 @@ describe("project init workflow", () => {
         description: "中文 happy path 项目",
         projectsRoot: path.join(root, "projects"),
         entryRoot,
-        dryRun: false
+        dryRun: false,
       }),
-      { onRun: (command, args) => commands.push([command, ...args].join(" ")) }
+      { onRun: (command, args) => commands.push([command, ...args].join(" ")) },
     );
 
     expect(result.kind).toBe("project-init-result");
-    expect(commands).toEqual(["git init", "git add README.md docs/kickoff/.gitkeep", "git commit -m init project"]);
+    expect(commands).toEqual([
+      "git init",
+      "git add README.md docs/kickoff/.gitkeep",
+      "git commit -m init project",
+    ]);
     expect(result.entryEventPath).toContain(path.join("entry", "activity", "events"));
-    await expect(readFile(path.join(root, "projects", "happy-path", "README.md"), "utf8")).resolves.toContain("中文 happy path 项目");
-    await expect(readFile(result.entryEventPath, "utf8")).resolves.toContain("\"event\":\"project.created\"");
+    await expect(
+      readFile(path.join(root, "projects", "happy-path", "README.md"), "utf8"),
+    ).resolves.toContain("中文 happy path 项目");
+    await expect(readFile(result.entryEventPath, "utf8")).resolves.toContain(
+      '"event":"project.created"',
+    );
     await expect(readFile(result.views.projectPage, "utf8")).resolves.toContain("# happy-path");
     await expect(readFile(result.views.projectIndex, "utf8")).resolves.toContain("[happy-path]");
   });
@@ -79,16 +87,16 @@ describe("project init workflow", () => {
         slug: "doctor-path",
         description: "doctor dashboard 项目",
         projectsRoot: path.join(root, "projects"),
-        entryRoot
-      })
+        entryRoot,
+      }),
     );
 
     const report = await runWithServices(
       runDoctor({
         projectsRoot: path.join(root, "projects"),
         entryRoot,
-        project: "doctor-path"
-      })
+        project: "doctor-path",
+      }),
     );
 
     expect(report.readonly).toBe(true);
@@ -108,22 +116,25 @@ describe("project init workflow", () => {
         slug: "alpha-project",
         description: "第一个落户项目",
         projectsRoot: path.join(root, "projects"),
-        entryRoot
-      })
+        entryRoot,
+      }),
     );
     await runWithServices(
       executeProjectInit({
         slug: "beta-project",
         description: "第二个落户项目",
         projectsRoot: path.join(root, "projects"),
-        entryRoot
-      })
+        entryRoot,
+      }),
     );
 
     const result = await runWithServices(listProjects({ entryRoot }));
 
     expect(result.kind).toBe("project-list-result");
-    expect(result.projects.map((project) => project.slug)).toEqual(["alpha-project", "beta-project"]);
+    expect(result.projects.map((project) => project.slug)).toEqual([
+      "alpha-project",
+      "beta-project",
+    ]);
     expect(result.projects[0]?.description).toBe("第一个落户项目");
     expect(result.humanOutputZh).toContain("已启动项目（2）");
   });
@@ -147,17 +158,24 @@ describe("project init workflow", () => {
         summary: "用户发起 legacy-project：旧格式 project.created 事实。",
         raw_ref: "inbox/2026/05/2026-05-01.md",
         project_ref: "projects/legacy-project.md",
-        artifacts: [path.join(root, "projects", "legacy-project"), "https://github.com/example/legacy-project"],
+        artifacts: [
+          path.join(root, "projects", "legacy-project"),
+          "https://github.com/example/legacy-project",
+        ],
         metadata: {
           project_name: "legacy-project",
           local_path: path.join(root, "projects", "legacy-project"),
-          github_url: "https://github.com/example/legacy-project"
-        }
+          github_url: "https://github.com/example/legacy-project",
+        },
       })}\n`,
-      "utf8"
+      "utf8",
     );
     await mkdir(path.join(entryRoot, "projects"), { recursive: true });
-    await writeFile(path.join(entryRoot, "projects", "index.md"), "- [ignored-index-only](ignored-index-only.md) - 不应作为事实源\n", "utf8");
+    await writeFile(
+      path.join(entryRoot, "projects", "index.md"),
+      "- [ignored-index-only](ignored-index-only.md) - 不应作为事实源\n",
+      "utf8",
+    );
 
     const result = await runWithServices(listProjects({ entryRoot }));
 
@@ -178,9 +196,9 @@ describe("project init workflow", () => {
         slug: "already-here",
         description: "目录已存在",
         projectsRoot: path.join(root, "projects"),
-        entryRoot
+        entryRoot,
       }),
-      "DIRECTORY_ALREADY_EXISTS"
+      "DIRECTORY_ALREADY_EXISTS",
     );
   });
 
@@ -195,10 +213,10 @@ describe("project init workflow", () => {
         description: "需要 GitHub",
         projectsRoot: path.join(root, "projects"),
         entryRoot,
-        createGithub: true
+        createGithub: true,
       }),
       "GH_UNAVAILABLE",
-      { missing: ["gh"] }
+      { missing: ["gh"] },
     );
   });
 
@@ -211,8 +229,8 @@ describe("project init workflow", () => {
         slug: "missing-root",
         description: "数据根不存在也应由 CLI 托管创建",
         projectsRoot: path.join(root, "projects"),
-        entryRoot
-      })
+        entryRoot,
+      }),
     );
 
     await expect(readFile(result.views.projectIndex, "utf8")).resolves.toContain("[missing-root]");
@@ -227,28 +245,36 @@ async function tempRoot(): Promise<string> {
 
 function runWithServices<A>(
   effect: Effect.Effect<A, EntryWorkflowError, FileSystem | Shell | Clock>,
-  shellOptions: Parameters<typeof fakeShell>[0] = {}
+  shellOptions: Parameters<typeof fakeShell>[0] = {},
 ): Promise<A> {
   return Effect.runPromise(
     effect.pipe(
       Effect.provide(
-        Layer.mergeAll(NodeFileSystemLive, fakeShell(shellOptions), fixedClock(new Date("2026-05-05T12:00:00.000Z")))
-      )
-    )
+        Layer.mergeAll(
+          NodeFileSystemLive,
+          fakeShell(shellOptions),
+          fixedClock(new Date("2026-05-05T12:00:00.000Z")),
+        ),
+      ),
+    ),
   );
 }
 
 async function expectFailureCode<A>(
   effect: Effect.Effect<A, EntryWorkflowError, FileSystem | Shell | Clock>,
   code: string,
-  shellOptions: Parameters<typeof fakeShell>[0] = {}
+  shellOptions: Parameters<typeof fakeShell>[0] = {},
 ): Promise<void> {
   const exit = await Effect.runPromiseExit(
     effect.pipe(
       Effect.provide(
-        Layer.mergeAll(NodeFileSystemLive, fakeShell(shellOptions), fixedClock(new Date("2026-05-05T12:00:00.000Z")))
-      )
-    )
+        Layer.mergeAll(
+          NodeFileSystemLive,
+          fakeShell(shellOptions),
+          fixedClock(new Date("2026-05-05T12:00:00.000Z")),
+        ),
+      ),
+    ),
   );
   expect(exit._tag).toBe("Failure");
   expect((errorToJson(exit).error as { code: string }).code).toBe(code);

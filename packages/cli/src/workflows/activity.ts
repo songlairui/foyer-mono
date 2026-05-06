@@ -5,7 +5,7 @@ import {
   ActivityExportSchema,
   type ActivityEvent,
   type ActivityExportTarget,
-  ActivityQuerySchema
+  ActivityQuerySchema,
 } from "../domain/contracts";
 import { EntryWorkflowError, invalidInput } from "../domain/errors";
 import { relativeToEntry, resolveConfig, todayParts } from "../domain/paths";
@@ -20,7 +20,11 @@ export function appendActivity(input: {
   project?: string;
   summary: string;
   lane?: string;
-}): Effect.Effect<{ eventFile: string; activityEvent: ActivityEvent; humanSummaryZh: string }, EntryWorkflowError, FileSystem | Clock> {
+}): Effect.Effect<
+  { eventFile: string; activityEvent: ActivityEvent; humanSummaryZh: string },
+  EntryWorkflowError,
+  FileSystem | Clock
+> {
   return Effect.gen(function* () {
     const config = resolveConfig({ entryRoot: input.entryRoot, deviceName: input.deviceName });
     const fs = yield* FileSystem;
@@ -29,7 +33,15 @@ export function appendActivity(input: {
     yield* fs.ensureDir(config.entryRoot);
     const parts = todayParts(now);
     const safeDevice = config.deviceName.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const eventFile = path.join(config.entryRoot, "activity", "events", safeDevice, parts.yyyy, parts.mm, `${parts.dd}.jsonl`);
+    const eventFile = path.join(
+      config.entryRoot,
+      "activity",
+      "events",
+      safeDevice,
+      parts.yyyy,
+      parts.mm,
+      `${parts.dd}.jsonl`,
+    );
     const eventBase = {
       ts: now.toISOString(),
       device: config.deviceName,
@@ -40,24 +52,26 @@ export function appendActivity(input: {
       raw_ref: relativeToEntry(config, eventFile),
       source: "foyer activity append",
       parents: [],
-      data: {}
+      data: {},
     };
     const digest = hashObject(eventBase);
     const activityEvent: ActivityEvent = {
       id: `evt_${digest.slice(0, 24)}`,
       ...eventBase,
-      hash: `sha256:${digest}`
+      hash: `sha256:${digest}`,
     };
     yield* writeActivityFact({ config, eventFile, event: activityEvent });
     return {
       eventFile,
       activityEvent,
-      humanSummaryZh: `已追加 activity event：${input.event}`
+      humanSummaryZh: `已追加 activity event：${input.event}`,
     };
   });
 }
 
-export function queryActivity(input: unknown): Effect.Effect<ActivityEvent[], EntryWorkflowError, FileSystem> {
+export function queryActivity(
+  input: unknown,
+): Effect.Effect<ActivityEvent[], EntryWorkflowError, FileSystem> {
   return Effect.gen(function* () {
     const parsed = ActivityQuerySchema.safeParse(input);
     if (!parsed.success) return yield* Effect.fail(invalidInput(parsed.error));
@@ -66,7 +80,9 @@ export function queryActivity(input: unknown): Effect.Effect<ActivityEvent[], En
     const fs = yield* FileSystem;
     const eventsRoot = path.join(config.entryRoot, "activity", "events");
     if (!(yield* fs.exists(eventsRoot))) return [];
-    const files = (yield* fs.listFiles(eventsRoot)).filter((file) => file.endsWith(".jsonl")).sort();
+    const files = (yield* fs.listFiles(eventsRoot))
+      .filter((file) => file.endsWith(".jsonl"))
+      .sort();
     const events: ActivityEvent[] = [];
 
     for (const file of files) {
@@ -106,10 +122,24 @@ export function parseActivityEvent(raw: unknown): ActivityEvent | undefined {
 
   const data = recordValue(raw.data);
   const metadata = recordValue(raw.metadata);
-  const project = stringValue(raw.project) ?? stringValue(metadata?.project_name) ?? projectFromRef(stringValue(raw.project_ref));
+  const project =
+    stringValue(raw.project) ??
+    stringValue(metadata?.project_name) ??
+    projectFromRef(stringValue(raw.project_ref));
   const artifacts = Array.isArray(raw.artifacts) ? raw.artifacts : [];
-  const projectPath = stringValue(data?.projectPath) ?? stringValue(metadata?.local_path) ?? artifacts.find((artifact): artifact is string => typeof artifact === "string" && artifact.startsWith("/"));
-  const repositoryUrl = stringValue(data?.repositoryUrl) ?? stringValue(metadata?.github_url) ?? artifacts.find((artifact): artifact is string => typeof artifact === "string" && /^https?:\/\//.test(artifact));
+  const projectPath =
+    stringValue(data?.projectPath) ??
+    stringValue(metadata?.local_path) ??
+    artifacts.find(
+      (artifact): artifact is string => typeof artifact === "string" && artifact.startsWith("/"),
+    );
+  const repositoryUrl =
+    stringValue(data?.repositoryUrl) ??
+    stringValue(metadata?.github_url) ??
+    artifacts.find(
+      (artifact): artifact is string =>
+        typeof artifact === "string" && /^https?:\/\//.test(artifact),
+    );
 
   const normalized = ActivityEventSchema.safeParse({
     id,
@@ -122,14 +152,16 @@ export function parseActivityEvent(raw: unknown): ActivityEvent | undefined {
     summary,
     raw_ref: stringValue(raw.raw_ref),
     source: stringValue(raw.source),
-    parents: Array.isArray(raw.parents) ? raw.parents.filter((parent): parent is string => typeof parent === "string") : [],
+    parents: Array.isArray(raw.parents)
+      ? raw.parents.filter((parent): parent is string => typeof parent === "string")
+      : [],
     data: {
-      ...(data ?? {}),
+      ...data,
       ...(projectPath ? { projectPath } : {}),
       ...(repositoryUrl ? { repositoryUrl } : {}),
-      ...(metadata ? { legacyMetadata: metadata } : {})
+      ...(metadata ? { legacyMetadata: metadata } : {}),
     },
-    hash: stringValue(raw.hash) ?? `sha256:${hashObject(raw)}`
+    hash: stringValue(raw.hash) ?? `sha256:${hashObject(raw)}`,
   });
 
   return normalized.success ? normalized.data : undefined;
@@ -162,12 +194,16 @@ export function activityContext(input: {
   project: string;
   budget?: number;
   format?: "markdown" | "json";
-}): Effect.Effect<string | { project: string; events: ActivityEvent[] }, EntryWorkflowError, FileSystem> {
+}): Effect.Effect<
+  string | { project: string; events: ActivityEvent[] },
+  EntryWorkflowError,
+  FileSystem
+> {
   return Effect.gen(function* () {
     const events = yield* queryActivity({
       entryRoot: input.entryRoot,
       project: input.project,
-      limit: 200
+      limit: 200,
     });
     if (input.format === "json") return { project: input.project, events };
 
@@ -175,15 +211,21 @@ export function activityContext(input: {
       `# ${input.project} activity context`,
       "",
       "## 最近事实",
-      ...events.map((event) => `- ${event.ts} ${event.event}: ${event.summary} (${event.raw_ref ?? event.id})`)
+      ...events.map(
+        (event) => `- ${event.ts} ${event.event}: ${event.summary} (${event.raw_ref ?? event.id})`,
+      ),
     ];
     const markdown = lines.join("\n") + "\n";
     const budget = input.budget ?? 6000;
-    return markdown.length > budget ? `${markdown.slice(0, budget)}\n\n<!-- 已按预算截断 -->\n` : markdown;
+    return markdown.length > budget
+      ? `${markdown.slice(0, budget)}\n\n<!-- 已按预算截断 -->\n`
+      : markdown;
   });
 }
 
-export function exportActivity(input: unknown): Effect.Effect<
+export function exportActivity(
+  input: unknown,
+): Effect.Effect<
   { target: ActivityExportTarget; out: string; files: string[]; humanSummaryZh: string },
   EntryWorkflowError,
   FileSystem
@@ -194,11 +236,13 @@ export function exportActivity(input: unknown): Effect.Effect<
 
     const request = parsed.data;
     const config = resolveConfig({ entryRoot: request.entryRoot });
-    const scopeProject = request.scope.startsWith("project:") ? request.scope.slice("project:".length) : undefined;
+    const scopeProject = request.scope.startsWith("project:")
+      ? request.scope.slice("project:".length)
+      : undefined;
     const events = yield* queryActivity({
       entryRoot: config.entryRoot,
       project: scopeProject,
-      limit: 1000
+      limit: 1000,
     });
     const fs = yield* FileSystem;
     const out = request.out ?? defaultExportOut(config.entryRoot, request.scope, request.target);
@@ -211,7 +255,7 @@ export function exportActivity(input: unknown): Effect.Effect<
         target: request.target,
         out,
         files: [file],
-        humanSummaryZh: "已导出 graphify Markdown corpus。"
+        humanSummaryZh: "已导出 graphify Markdown corpus。",
       };
     }
 
@@ -223,19 +267,22 @@ export function exportActivity(input: unknown): Effect.Effect<
         target: request.target,
         out: file,
         files: [file],
-        humanSummaryZh: "已导出 Hyper-Extract Markdown input。"
+        humanSummaryZh: "已导出 Hyper-Extract Markdown input。",
       };
     }
 
     if (request.target === "hyperextract-ka") {
       const file = request.out ?? out;
-      yield* fs.writeFile(file, `${JSON.stringify(renderKnowledgeAbstract(scopeProject ?? request.scope, events), null, 2)}\n`);
+      yield* fs.writeFile(
+        file,
+        `${JSON.stringify(renderKnowledgeAbstract(scopeProject ?? request.scope, events), null, 2)}\n`,
+      );
       yield* writeExportCursor(config.entryRoot, request.target, request.scope, events);
       return {
         target: request.target,
         out: file,
         files: [file],
-        humanSummaryZh: "已生成最小 Hyper-Extract Knowledge Abstract 派生物。"
+        humanSummaryZh: "已生成最小 Hyper-Extract Knowledge Abstract 派生物。",
       };
     }
 
@@ -248,7 +295,7 @@ export function exportActivity(input: unknown): Effect.Effect<
         summary: event.summary,
         raw_text: `${event.event} ${event.summary}`,
         raw_ref: event.raw_ref,
-        source_path: event.raw_ref
+        source_path: event.raw_ref,
       }));
       const file = request.out ?? out;
       yield* fs.writeFile(file, JSON.stringify({ records }, null, 2));
@@ -257,11 +304,15 @@ export function exportActivity(input: unknown): Effect.Effect<
         target: request.target,
         out: file,
         files: [file],
-        humanSummaryZh: "已导出等价本地搜索索引。"
+        humanSummaryZh: "已导出等价本地搜索索引。",
       };
     }
 
-    return yield* Effect.fail(new EntryWorkflowError("UNSUPPORTED_EXPORT_TARGET", "不支持的导出目标。", { target: request.target }));
+    return yield* Effect.fail(
+      new EntryWorkflowError("UNSUPPORTED_EXPORT_TARGET", "不支持的导出目标。", {
+        target: request.target,
+      }),
+    );
   });
 }
 
@@ -271,7 +322,14 @@ export function searchActivity(input: {
   query: string;
   limit?: number;
 }): Effect.Effect<
-  Array<{ event_id: string; project?: string; ts: string; summary: string; raw_ref?: string; score: number }>,
+  Array<{
+    event_id: string;
+    project?: string;
+    ts: string;
+    summary: string;
+    raw_ref?: string;
+    score: number;
+  }>,
   EntryWorkflowError,
   FileSystem
 > {
@@ -279,12 +337,13 @@ export function searchActivity(input: {
     const events = yield* queryActivity({
       entryRoot: input.entryRoot,
       project: input.project,
-      limit: 1000
+      limit: 1000,
     });
     const terms = input.query.toLowerCase().split(/\s+/).filter(Boolean);
     const matches = events
       .map((event) => {
-        const haystack = `${event.event} ${event.summary} ${event.project ?? ""} ${event.lane ?? ""}`.toLowerCase();
+        const haystack =
+          `${event.event} ${event.summary} ${event.project ?? ""} ${event.lane ?? ""}`.toLowerCase();
         const score = terms.reduce((sum, term) => sum + (haystack.includes(term) ? 1 : 0), 0);
         return { event, score };
       })
@@ -298,26 +357,41 @@ export function searchActivity(input: {
       ts: event.ts,
       summary: event.summary,
       raw_ref: event.raw_ref,
-      score
+      score,
     }));
   });
 }
 
 function defaultExportOut(entryRoot: string, scope: string, target: ActivityExportTarget): string {
   const safeScope = scope.replace(/[^a-zA-Z0-9._:-]/g, "_").replace(/:/g, "-");
-  if (target === "graphify-corpus") return path.join(entryRoot, "activity", "derived", "graphify", safeScope, "corpus");
-  if (target === "hyperextract-input") return path.join(entryRoot, "activity", "derived", "hyperextract", safeScope, "input.md");
-  if (target === "hyperextract-ka") return path.join(entryRoot, "activity", "derived", "hyperextract", safeScope, "knowledge-abstract.json");
+  if (target === "graphify-corpus")
+    return path.join(entryRoot, "activity", "derived", "graphify", safeScope, "corpus");
+  if (target === "hyperextract-input")
+    return path.join(entryRoot, "activity", "derived", "hyperextract", safeScope, "input.md");
+  if (target === "hyperextract-ka")
+    return path.join(
+      entryRoot,
+      "activity",
+      "derived",
+      "hyperextract",
+      safeScope,
+      "knowledge-abstract.json",
+    );
   return path.join(entryRoot, "activity", "derived", "fts", `${safeScope}.json`);
 }
 
 function renderEventsMarkdown(title: string, events: ActivityEvent[]): string {
-  return [
-    `# ${title}`,
-    "",
-    "## Activity Events",
-    ...events.map((event) => `- ${event.ts} ${event.event} ${event.project ?? ""}: ${event.summary} [${event.raw_ref ?? event.id}]`)
-  ].join("\n") + "\n";
+  return (
+    [
+      `# ${title}`,
+      "",
+      "## Activity Events",
+      ...events.map(
+        (event) =>
+          `- ${event.ts} ${event.event} ${event.project ?? ""}: ${event.summary} [${event.raw_ref ?? event.id}]`,
+      ),
+    ].join("\n") + "\n"
+  );
 }
 
 function renderHyperExtractInput(title: string, events: ActivityEvent[]): string {
@@ -327,7 +401,7 @@ function renderHyperExtractInput(title: string, events: ActivityEvent[]): string
     "language: zh",
     "---",
     "",
-    renderEventsMarkdown(title, events)
+    renderEventsMarkdown(title, events),
   ].join("\n");
 }
 
@@ -335,7 +409,7 @@ function writeExportCursor(
   entryRoot: string,
   target: ActivityExportTarget,
   scope: string,
-  events: ActivityEvent[]
+  events: ActivityEvent[],
 ): Effect.Effect<void, EntryWorkflowError, FileSystem> {
   return Effect.gen(function* () {
     const fs = yield* FileSystem;
@@ -350,11 +424,11 @@ function writeExportCursor(
           scope,
           event_count: events.length,
           latest_event_id: latest?.id,
-          latest_ts: latest?.ts
+          latest_ts: latest?.ts,
         },
         null,
-        2
-      )}\n`
+        2,
+      )}\n`,
     );
   });
 }
@@ -372,17 +446,19 @@ function renderKnowledgeAbstract(title: string, events: ActivityEvent[]) {
       ts: event.ts,
       event: event.event,
       summary: event.summary,
-      evidence_ref: event.raw_ref ?? event.id
+      evidence_ref: event.raw_ref ?? event.id,
     })),
     decisions: events
       .filter((event) => event.event === "decision.recorded")
       .map((event) => ({
         ts: event.ts,
         summary: event.summary,
-        evidence_ref: event.raw_ref ?? event.id
+        evidence_ref: event.raw_ref ?? event.id,
       })),
     blockers: [],
-    next_actions: latest ? [`继续推进 ${latest.project ?? title}，参考 ${latest.raw_ref ?? latest.id}`] : [],
-    evidence_refs: events.map((event) => event.raw_ref ?? event.id)
+    next_actions: latest
+      ? [`继续推进 ${latest.project ?? title}，参考 ${latest.raw_ref ?? latest.id}`]
+      : [],
+    evidence_refs: events.map((event) => event.raw_ref ?? event.id),
   };
 }

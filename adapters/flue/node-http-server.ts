@@ -24,13 +24,15 @@ const server = createServer(async (request, response) => {
     send(response, 400, {
       ok: false,
       messageZh: "请求 JSON 不合法。",
-      error: error instanceof Error ? error.message : String(error)
+      error: error instanceof Error ? error.message : String(error),
     });
   }
 });
 
 server.listen(port, "127.0.0.1", () => {
-  process.stderr.write(`entry-init-project Flue HTTP adapter listening on http://127.0.0.1:${port}\n`);
+  process.stderr.write(
+    `entry-init-project Flue HTTP adapter listening on http://127.0.0.1:${port}\n`,
+  );
 });
 
 function readBody(request: NodeJS.ReadableStream): Promise<string> {
@@ -44,7 +46,14 @@ function readBody(request: NodeJS.ReadableStream): Promise<string> {
   });
 }
 
-function send(response: { writeHead(status: number, headers: Record<string, string>): void; end(body: string): void }, status: number, body: unknown): void {
+function send(
+  response: {
+    writeHead(status: number, headers: Record<string, string>): void;
+    end(body: string): void;
+  },
+  status: number,
+  body: unknown,
+): void {
   response.writeHead(status, { "content-type": "application/json; charset=utf-8" });
   response.end(`${JSON.stringify(body, null, 2)}\n`);
 }

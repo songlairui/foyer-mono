@@ -30,8 +30,18 @@ export function writeActivityFact(input: {
     const fs = yield* FileSystem;
     const hashId = input.event.hash.replace(/^sha256:/, "");
     const nodeFile = path.join(input.config.entryRoot, "activity", "nodes", `${hashId}.json`);
-    const frontierFile = path.join(input.config.entryRoot, "activity", "frontier", `${safeDevice(input.config.deviceName)}.json`);
-    const manifestFile = path.join(input.config.entryRoot, "activity", "manifests", `${safeDevice(input.config.deviceName)}.json`);
+    const frontierFile = path.join(
+      input.config.entryRoot,
+      "activity",
+      "frontier",
+      `${safeDevice(input.config.deviceName)}.json`,
+    );
+    const manifestFile = path.join(
+      input.config.entryRoot,
+      "activity",
+      "manifests",
+      `${safeDevice(input.config.deviceName)}.json`,
+    );
 
     yield* fs.appendFile(input.eventFile, `${JSON.stringify(input.event)}\n`);
     yield* fs.writeFile(
@@ -47,11 +57,11 @@ export function writeActivityFact(input: {
           summary: input.event.summary,
           lanes: input.event.lane ? [input.event.lane] : [],
           event_id: input.event.id,
-          event_ref: relativeToEntry(input.config, input.eventFile)
+          event_ref: relativeToEntry(input.config, input.eventFile),
         },
         null,
-        2
-      )}\n`
+        2,
+      )}\n`,
     );
 
     const frontier = yield* readJson<FrontierView>(frontierFile, {
@@ -59,7 +69,7 @@ export function writeActivityFact(input: {
       stream: "default",
       max_seq: 0,
       roots: {},
-      updated_at: input.event.ts
+      updated_at: input.event.ts,
     });
     frontier.max_seq += 1;
     frontier.roots["0"] = input.event.hash;
@@ -71,7 +81,7 @@ export function writeActivityFact(input: {
       updated_at: input.event.ts,
       max_seq: 0,
       event_files: [],
-      known_hashes: []
+      known_hashes: [],
     });
     manifest.updated_at = input.event.ts;
     manifest.max_seq = frontier.max_seq;
@@ -81,7 +91,10 @@ export function writeActivityFact(input: {
   });
 }
 
-function readJson<A>(filePath: string, fallback: A): Effect.Effect<A, EntryWorkflowError, FileSystem> {
+function readJson<A>(
+  filePath: string,
+  fallback: A,
+): Effect.Effect<A, EntryWorkflowError, FileSystem> {
   return Effect.gen(function* () {
     const fs = yield* FileSystem;
     if (!(yield* fs.exists(filePath))) return fallback;

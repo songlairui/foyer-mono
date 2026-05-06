@@ -2,10 +2,21 @@
 import { Command } from "commander";
 import { Effect } from "effect";
 import { readFileSync } from "node:fs";
-import { appendActivity, activityContext, exportActivity, queryActivity, searchActivity } from "../workflows/activity";
+import {
+  appendActivity,
+  activityContext,
+  exportActivity,
+  queryActivity,
+  searchActivity,
+} from "../workflows/activity";
 import { runDoctor } from "../workflows/doctor";
 import { appendInbox } from "../workflows/inbox";
-import { executeProjectInit, listProjects, planProjectInit, upsertProjectIndex } from "../workflows/project-init";
+import {
+  executeProjectInit,
+  listProjects,
+  planProjectInit,
+  upsertProjectIndex,
+} from "../workflows/project-init";
 import { repoDevices, repoManifests, repoStatus } from "../workflows/repo";
 import { Clock, FileSystem, NodeServicesLive, Shell } from "../services/context";
 import { errorToJson, exitCodeFor } from "../domain/errors";
@@ -14,10 +25,7 @@ type OutputMode = { json?: boolean };
 
 const program = new Command();
 
-program
-  .name("foyer")
-  .description("Foyer 项目落户、activity 记录和派生导出 CLI")
-  .version("0.1.0");
+program.name("foyer").description("Foyer 项目落户、activity 记录和派生导出 CLI").version("0.1.0");
 
 const project = program.command("project").description("项目初始化和索引命令");
 
@@ -47,7 +55,7 @@ project
       githubOwner: options.githubOwner,
       githubVisibility: options.githubVisibility,
       createGithub: Boolean(options.github),
-      dryRun: Boolean(options.dryRun)
+      dryRun: Boolean(options.dryRun),
     };
     if (options.dryRun) {
       await run(planProjectInit(input), options);
@@ -88,7 +96,16 @@ project
   .option("--json", "输出稳定 JSON")
   .description("更新或生成 projects/index.md")
   .action(async (slug, options) => {
-    await run(upsertProjectIndex({ slug, description: options.desc, lane: options.lane, owner: options.owner, entryRoot: rootOption(options) }), options);
+    await run(
+      upsertProjectIndex({
+        slug,
+        description: options.desc,
+        lane: options.lane,
+        owner: options.owner,
+        entryRoot: rootOption(options),
+      }),
+      options,
+    );
   });
 
 const inbox = program.command("inbox").description("inbox 追加命令");
@@ -103,7 +120,15 @@ inbox
   .option("--json", "输出稳定 JSON")
   .description("追加 inbox 记录，并写入 activity event")
   .action(async (options) => {
-    await run(appendInbox({ project: options.project, rawFile: options.rawFile, text: options.text, entryRoot: rootOption(options) }), options);
+    await run(
+      appendInbox({
+        project: options.project,
+        rawFile: options.rawFile,
+        text: options.text,
+        entryRoot: rootOption(options),
+      }),
+      options,
+    );
   });
 
 const activity = program.command("activity").description("activity event 查询、上下文和导出");
@@ -119,7 +144,16 @@ activity
   .option("--json", "输出稳定 JSON")
   .description("追加 machine-readable activity event")
   .action(async (options) => {
-    await run(appendActivity({ event: options.event, project: options.project, summary: options.summary, lane: options.lane, entryRoot: rootOption(options) }), options);
+    await run(
+      appendActivity({
+        event: options.event,
+        project: options.project,
+        summary: options.summary,
+        lane: options.lane,
+        entryRoot: rootOption(options),
+      }),
+      options,
+    );
   });
 
 activity
@@ -133,7 +167,16 @@ activity
   .option("--json", "输出稳定 JSON")
   .description("通过 CLI 查询 activity event；agent 不应直接读取 raw jsonl")
   .action(async (options) => {
-    await run(queryActivity({ project: options.project, event: options.event, since: options.since, limit: options.limit, entryRoot: rootOption(options) }), options);
+    await run(
+      queryActivity({
+        project: options.project,
+        event: options.event,
+        since: options.since,
+        limit: options.limit,
+        entryRoot: rootOption(options),
+      }),
+      options,
+    );
   });
 
 activity
@@ -146,20 +189,39 @@ activity
   .option("--json", "输出稳定 JSON")
   .description("生成低上下文项目材料")
   .action(async (options) => {
-    await run(activityContext({ project: options.project, budget: options.budget, format: options.format, entryRoot: rootOption(options) }), options);
+    await run(
+      activityContext({
+        project: options.project,
+        budget: options.budget,
+        format: options.format,
+        entryRoot: rootOption(options),
+      }),
+      options,
+    );
   });
 
 activity
   .command("export")
   .requiredOption("--scope <scope>", "project:<slug> 或 all-projects")
-  .requiredOption("--target <target>", "graphify-corpus / hyperextract-input / hyperextract-ka / fts-index")
+  .requiredOption(
+    "--target <target>",
+    "graphify-corpus / hyperextract-input / hyperextract-ka / fts-index",
+  )
   .option("--out <path>", "输出路径")
   .option("--foyer-root <path>", "Foyer 数据根目录")
   .option("--entry-root <path>", "兼容旧参数：旧数据根目录")
   .option("--json", "输出稳定 JSON")
   .description("导出可重建派生物，不能回写为事实源")
   .action(async (options) => {
-    await run(exportActivity({ scope: options.scope, target: options.target, out: options.out, entryRoot: rootOption(options) }), options);
+    await run(
+      exportActivity({
+        scope: options.scope,
+        target: options.target,
+        out: options.out,
+        entryRoot: rootOption(options),
+      }),
+      options,
+    );
   });
 
 const repo = program.command("repo").description("设备和仓库状态查询");
@@ -203,7 +265,15 @@ program
   .option("--json", "输出稳定 JSON")
   .description("只读 dashboard：列出 Foyer 历史数据、sidecar、视图、派生物和本地仓库状态")
   .action(async (options) => {
-    await run(runDoctor({ entryRoot: rootOption(options), projectsRoot: options.projectsRoot, project: options.project, limit: options.limit }), options);
+    await run(
+      runDoctor({
+        entryRoot: rootOption(options),
+        projectsRoot: options.projectsRoot,
+        project: options.project,
+        limit: options.limit,
+      }),
+      options,
+    );
   });
 
 program
@@ -216,7 +286,15 @@ program
   .option("--json", "输出稳定 JSON")
   .description("等价本地搜索派生层查询，返回精确引用")
   .action(async (query, options) => {
-    await run(searchActivity({ query, project: options.project, limit: options.limit, entryRoot: rootOption(options) }), options);
+    await run(
+      searchActivity({
+        query,
+        project: options.project,
+        limit: options.limit,
+        entryRoot: rootOption(options),
+      }),
+      options,
+    );
   });
 
 program.parseAsync(process.argv).catch((error) => {
@@ -226,7 +304,10 @@ program.parseAsync(process.argv).catch((error) => {
 
 type RuntimeServices = FileSystem | Shell | Clock;
 
-async function run<A, E>(effect: Effect.Effect<A, E, RuntimeServices>, options: OutputMode): Promise<void> {
+async function run<A, E>(
+  effect: Effect.Effect<A, E, RuntimeServices>,
+  options: OutputMode,
+): Promise<void> {
   const runnable = Effect.provide(effect, NodeServicesLive);
   const exit = await Effect.runPromiseExit(runnable);
   if (exit._tag === "Success") {
@@ -257,7 +338,10 @@ function writeSuccess(value: unknown, options: OutputMode): void {
     process.stdout.write(String((value as { humanOutputZh: unknown }).humanOutputZh));
     return;
   }
-  const humanSummaryZh = typeof value === "object" && value && "humanSummaryZh" in value ? String((value as { humanSummaryZh: unknown }).humanSummaryZh) : "命令执行完成。";
+  const humanSummaryZh =
+    typeof value === "object" && value && "humanSummaryZh" in value
+      ? String((value as { humanSummaryZh: unknown }).humanSummaryZh)
+      : "命令执行完成。";
   process.stdout.write(`${humanSummaryZh}\n`);
 }
 

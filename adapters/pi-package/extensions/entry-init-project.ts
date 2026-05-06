@@ -20,20 +20,20 @@ export function runFoyerProjectInit(input: ProjectInitCommandInput) {
     input.lane ?? "project",
     "--owner",
     input.owner ?? "me",
-    "--json"
+    "--json",
   ];
 
   if (input.github) args.push("--github");
   if (input.dryRun ?? true) args.push("--dry-run");
 
   const result = spawnSync("foyer", args, {
-    encoding: "utf8"
+    encoding: "utf8",
   });
 
   return {
     ok: result.status === 0,
     status: result.status,
     stdout: result.stdout,
-    stderr: result.stderr
+    stderr: result.stderr,
   };
 }

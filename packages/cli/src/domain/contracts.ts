@@ -24,7 +24,7 @@ export const ProjectInitRequestSchema = z.object({
   githubVisibility: VisibilitySchema.default("private"),
   createGithub: z.boolean().default(false),
   dryRun: z.boolean().default(false),
-  deviceName: z.string().optional()
+  deviceName: z.string().optional(),
 });
 
 export type ProjectInitRequest = z.infer<typeof ProjectInitRequestSchema>;
@@ -34,7 +34,7 @@ export const RuntimeConfigSchema = z.object({
   entryRoot: z.string(),
   githubOwner: z.string().optional(),
   githubVisibility: VisibilitySchema,
-  deviceName: z.string()
+  deviceName: z.string(),
 });
 
 export type RuntimeConfig = z.infer<typeof RuntimeConfigSchema>;
@@ -44,7 +44,7 @@ export const PlanStepSchema = z.object({
   titleZh: z.string(),
   detailZh: z.string(),
   effect: z.enum(["check", "write", "shell", "network", "derived"]),
-  status: z.enum(["planned", "skipped", "done"])
+  status: z.enum(["planned", "skipped", "done"]),
 });
 
 export type PlanStep = z.infer<typeof PlanStepSchema>;
@@ -59,11 +59,11 @@ export const ProjectInitPlanSchema = z.object({
     projectPage: z.string(),
     projectIndex: z.string(),
     inboxFile: z.string(),
-    derivedRoot: z.string()
+    derivedRoot: z.string(),
   }),
   steps: z.array(PlanStepSchema),
   warnings: z.array(z.string()),
-  humanSummaryZh: z.string()
+  humanSummaryZh: z.string(),
 });
 
 export type ProjectInitPlan = z.infer<typeof ProjectInitPlanSchema>;
@@ -74,7 +74,7 @@ export const ActivityEventTypeSchema = z.enum([
   "inbox.appended",
   "project.indexed",
   "decision.recorded",
-  "activity.exported"
+  "activity.exported",
 ]);
 
 export type ActivityEventType = z.infer<typeof ActivityEventTypeSchema>;
@@ -92,7 +92,7 @@ export const ActivityEventSchema = z.object({
   source: z.string().optional(),
   parents: z.array(z.string()).default([]),
   data: z.record(z.string(), z.unknown()).default({}),
-  hash: z.string()
+  hash: z.string(),
 });
 
 export type ActivityEvent = z.infer<typeof ActivityEventSchema>;
@@ -106,11 +106,11 @@ export const ProjectInitResultSchema = z.object({
   views: z.object({
     projectPage: z.string(),
     projectIndex: z.string(),
-    inboxFile: z.string()
+    inboxFile: z.string(),
   }),
   steps: z.array(PlanStepSchema),
   activityEvent: ActivityEventSchema,
-  humanSummaryZh: z.string()
+  humanSummaryZh: z.string(),
 });
 
 export type ProjectInitResult = z.infer<typeof ProjectInitResultSchema>;
@@ -118,7 +118,7 @@ export type ProjectInitResult = z.infer<typeof ProjectInitResultSchema>;
 export const ProjectListRequestSchema = z.object({
   foyerRoot: z.string().optional(),
   entryRoot: z.string().optional(),
-  limit: z.number().int().positive().max(1000).default(1000)
+  limit: z.number().int().positive().max(1000).default(1000),
 });
 
 export type ProjectListRequest = z.infer<typeof ProjectListRequestSchema>;
@@ -133,7 +133,7 @@ export const ProjectListItemSchema = z.object({
   createdAt: z.string(),
   createdEventId: z.string(),
   latestEventAt: z.string().optional(),
-  latestEventId: z.string().optional()
+  latestEventId: z.string().optional(),
 });
 
 export type ProjectListItem = z.infer<typeof ProjectListItemSchema>;
@@ -143,7 +143,7 @@ export const ProjectListResultSchema = z.object({
   entryRoot: z.string(),
   projects: z.array(ProjectListItemSchema),
   humanOutputZh: z.string(),
-  humanSummaryZh: z.string()
+  humanSummaryZh: z.string(),
 });
 
 export type ProjectListResult = z.infer<typeof ProjectListResultSchema>;
@@ -153,19 +153,24 @@ export const ActivityQuerySchema = z.object({
   project: z.string().optional(),
   event: ActivityEventTypeSchema.optional(),
   since: z.string().optional(),
-  limit: z.number().int().positive().max(1000).default(100)
+  limit: z.number().int().positive().max(1000).default(100),
 });
 
 export type ActivityQuery = z.infer<typeof ActivityQuerySchema>;
 
-export const ActivityExportTargetSchema = z.enum(["graphify-corpus", "hyperextract-input", "hyperextract-ka", "fts-index"]);
+export const ActivityExportTargetSchema = z.enum([
+  "graphify-corpus",
+  "hyperextract-input",
+  "hyperextract-ka",
+  "fts-index",
+]);
 export type ActivityExportTarget = z.infer<typeof ActivityExportTargetSchema>;
 
 export const ActivityExportSchema = z.object({
   entryRoot: z.string().optional(),
   scope: z.string(),
   target: ActivityExportTargetSchema,
-  out: z.string().optional()
+  out: z.string().optional(),
 });
 
 export type ActivityExport = z.infer<typeof ActivityExportSchema>;

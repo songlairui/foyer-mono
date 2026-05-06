@@ -24,7 +24,7 @@ export function execute(payload: ProjectInitPayload) {
     return {
       ok: false,
       needsConfirmation: true,
-      messageZh: "执行项目初始化前需要确认。请先查看 dry-run 计划。"
+      messageZh: "执行项目初始化前需要确认。请先查看 dry-run 计划。",
     };
   }
   return runFoyer(payload, false);
@@ -46,7 +46,7 @@ function runFoyer(payload: ProjectInitPayload, dryRun: boolean) {
     payload.lane ?? "project",
     "--owner",
     payload.owner ?? "me",
-    "--json"
+    "--json",
   ];
 
   if (payload.github) args.push("--github");
@@ -60,6 +60,6 @@ function runFoyer(payload: ProjectInitPayload, dryRun: boolean) {
     ok: result.status === 0,
     status: result.status,
     stdout: result.stdout,
-    stderr: result.stderr
+    stderr: result.stderr,
   };
 }

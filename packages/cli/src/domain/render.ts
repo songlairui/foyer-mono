@@ -29,7 +29,11 @@ ${request.description}
 `;
 }
 
-export function renderProjectPage(request: ProjectInitRequest, projectPath: string, event: ActivityEvent): string {
+export function renderProjectPage(
+  request: ProjectInitRequest,
+  projectPath: string,
+  event: ActivityEvent,
+): string {
   return `# ${request.slug}
 
 ## 当前摘要
@@ -85,14 +89,14 @@ export function makeActivityEvent(input: {
     raw_ref: input.rawRef,
     source: input.source,
     parents: [],
-    data: input.data ?? {}
+    data: input.data ?? {},
   };
   const hash = hashObject(base);
 
   return {
     id: `evt_${hash.slice(0, 24)}`,
     ...base,
-    hash: `sha256:${hash}`
+    hash: `sha256:${hash}`,
   };
 }
 

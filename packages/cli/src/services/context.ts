@@ -31,7 +31,7 @@ export interface ShellService {
   run(
     command: string,
     args: readonly string[],
-    options?: { cwd?: string; allowFailure?: boolean }
+    options?: { cwd?: string; allowFailure?: boolean },
   ): Effect.Effect<CommandResult, EntryWorkflowError>;
 }
 
@@ -54,17 +54,17 @@ export const NodeFileSystemLive = Layer.succeed(FileSystem, {
           return false;
         }
       },
-      catch: (cause) => filesystemError("exists", filePath, cause)
+      catch: (cause) => filesystemError("exists", filePath, cause),
     }),
   ensureDir: (dirPath) =>
     Effect.tryPromise({
       try: () => fs.mkdir(dirPath, { recursive: true }).then(() => undefined),
-      catch: (cause) => filesystemError("ensureDir", dirPath, cause)
+      catch: (cause) => filesystemError("ensureDir", dirPath, cause),
     }),
   readFile: (filePath) =>
     Effect.tryPromise({
       try: () => fs.readFile(filePath, "utf8"),
-      catch: (cause) => filesystemError("readFile", filePath, cause)
+      catch: (cause) => filesystemError("readFile", filePath, cause),
     }),
   writeFile: (filePath, content) =>
     Effect.tryPromise({
@@ -72,7 +72,7 @@ export const NodeFileSystemLive = Layer.succeed(FileSystem, {
         await fs.mkdir(path.dirname(filePath), { recursive: true });
         await fs.writeFile(filePath, content, "utf8");
       },
-      catch: (cause) => filesystemError("writeFile", filePath, cause)
+      catch: (cause) => filesystemError("writeFile", filePath, cause),
     }),
   appendFile: (filePath, content) =>
     Effect.tryPromise({
@@ -80,12 +80,12 @@ export const NodeFileSystemLive = Layer.succeed(FileSystem, {
         await fs.mkdir(path.dirname(filePath), { recursive: true });
         await fs.appendFile(filePath, content, "utf8");
       },
-      catch: (cause) => filesystemError("appendFile", filePath, cause)
+      catch: (cause) => filesystemError("appendFile", filePath, cause),
     }),
   listFiles: (root) =>
     Effect.tryPromise({
       try: () => listFilesRecursive(root),
-      catch: (cause) => filesystemError("listFiles", root, cause)
+      catch: (cause) => filesystemError("listFiles", root, cause),
     }),
   stat: (filePath) =>
     Effect.tryPromise({
@@ -94,11 +94,11 @@ export const NodeFileSystemLive = Layer.succeed(FileSystem, {
         return {
           isDirectory: value.isDirectory(),
           isFile: value.isFile(),
-          mtimeMs: value.mtimeMs
+          mtimeMs: value.mtimeMs,
         };
       },
-      catch: (cause) => filesystemError("stat", filePath, cause)
-    })
+      catch: (cause) => filesystemError("stat", filePath, cause),
+    }),
 });
 
 export const NodeShellLive = Layer.succeed(Shell, {
@@ -107,11 +107,11 @@ export const NodeShellLive = Layer.succeed(Shell, {
       const result = yield* runCommand("command", ["-v", command], { allowFailure: true });
       return result.exitCode === 0;
     }),
-  run: (command, args, options) => runCommand(command, args, options)
+  run: (command, args, options) => runCommand(command, args, options),
 });
 
 export const SystemClockLive = Layer.succeed(Clock, {
-  now: () => Effect.sync(() => new Date())
+  now: () => Effect.sync(() => new Date()),
 });
 
 export const NodeServicesLive = Layer.mergeAll(NodeFileSystemLive, NodeShellLive, SystemClockLive);
@@ -119,13 +119,13 @@ export const NodeServicesLive = Layer.mergeAll(NodeFileSystemLive, NodeShellLive
 function runCommand(
   command: string,
   args: readonly string[],
-  options: { cwd?: string; allowFailure?: boolean } = {}
+  options: { cwd?: string; allowFailure?: boolean } = {},
 ): Effect.Effect<CommandResult, EntryWorkflowError> {
   return Effect.async<CommandResult, EntryWorkflowError>((resume) => {
     const child = spawn(command, [...args], {
       cwd: options.cwd,
       shell: false,
-      env: process.env
+      env: process.env,
     });
 
     let stdout = "";

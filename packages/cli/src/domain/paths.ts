@@ -19,13 +19,22 @@ export function resolveConfig(overrides: {
   deviceName?: string;
 }): RuntimeConfig {
   return {
-    projectsRoot: path.resolve(expandHome(overrides.projectsRoot ?? process.env.PROJECTS_ROOT ?? "~/repo/projects")),
+    projectsRoot: path.resolve(
+      expandHome(overrides.projectsRoot ?? process.env.PROJECTS_ROOT ?? "~/repo/projects"),
+    ),
     entryRoot: path.resolve(
-      expandHome(overrides.foyerRoot ?? overrides.entryRoot ?? process.env.FOYER_ROOT ?? process.env.ENTRY_ROOT ?? DEFAULT_FOYER_ROOT)
+      expandHome(
+        overrides.foyerRoot ??
+          overrides.entryRoot ??
+          process.env.FOYER_ROOT ??
+          process.env.ENTRY_ROOT ??
+          DEFAULT_FOYER_ROOT,
+      ),
     ),
     githubOwner: overrides.githubOwner ?? process.env.GITHUB_OWNER,
-    githubVisibility: overrides.githubVisibility ?? normalizeVisibility(process.env.GITHUB_VISIBILITY),
-    deviceName: overrides.deviceName ?? process.env.DEVICE_NAME ?? os.hostname()
+    githubVisibility:
+      overrides.githubVisibility ?? normalizeVisibility(process.env.GITHUB_VISIBILITY),
+    deviceName: overrides.deviceName ?? process.env.DEVICE_NAME ?? os.hostname(),
   };
 }
 
@@ -49,11 +58,19 @@ export function entryPaths(config: RuntimeConfig, slug: string, date: Date) {
   const safeDevice = config.deviceName.replace(/[^a-zA-Z0-9._-]/g, "_");
 
   return {
-    eventFile: path.join(config.entryRoot, "activity", "events", safeDevice, yyyy, mm, `${dd}.jsonl`),
+    eventFile: path.join(
+      config.entryRoot,
+      "activity",
+      "events",
+      safeDevice,
+      yyyy,
+      mm,
+      `${dd}.jsonl`,
+    ),
     projectPage: path.join(config.entryRoot, "projects", `${slug}.md`),
     projectIndex: path.join(config.entryRoot, "projects", "index.md"),
     inboxFile: path.join(config.entryRoot, "inbox", yyyy, mm, `${ymd}.md`),
-    derivedRoot: path.join(config.entryRoot, "activity", "derived")
+    derivedRoot: path.join(config.entryRoot, "activity", "derived"),
   };
 }
 

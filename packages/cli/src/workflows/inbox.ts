@@ -11,7 +11,11 @@ export function appendInbox(input: {
   project: string;
   rawFile?: string;
   text?: string;
-}): Effect.Effect<{ inboxFile: string; humanSummaryZh: string }, EntryWorkflowError, FileSystem | Clock> {
+}): Effect.Effect<
+  { inboxFile: string; humanSummaryZh: string },
+  EntryWorkflowError,
+  FileSystem | Clock
+> {
   return Effect.gen(function* () {
     const config = resolveConfig({ entryRoot: input.entryRoot, deviceName: input.deviceName });
     const fs = yield* FileSystem;
@@ -20,21 +24,24 @@ export function appendInbox(input: {
 
     yield* fs.ensureDir(config.entryRoot);
 
-    const content = input.rawFile ? yield* fs.readFile(input.rawFile) : input.text ?? "";
+    const content = input.rawFile ? yield* fs.readFile(input.rawFile) : (input.text ?? "");
     const parts = todayParts(now);
     const inboxFile = path.join(config.entryRoot, "inbox", parts.yyyy, parts.mm, `${parts.ymd}.md`);
-    yield* fs.appendFile(inboxFile, `\n## ${now.toISOString()} ${input.project}\n\n${content.trim()}\n`);
+    yield* fs.appendFile(
+      inboxFile,
+      `\n## ${now.toISOString()} ${input.project}\n\n${content.trim()}\n`,
+    );
     yield* appendActivity({
       entryRoot: config.entryRoot,
       deviceName: config.deviceName,
       event: "inbox.appended",
       project: input.project,
-      summary: `追加 inbox 记录：${input.project}`
+      summary: `追加 inbox 记录：${input.project}`,
     });
 
     return {
       inboxFile,
-      humanSummaryZh: `已追加 inbox：${input.project}`
+      humanSummaryZh: `已追加 inbox：${input.project}`,
     };
   });
 }

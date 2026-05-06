@@ -48,13 +48,13 @@ foyer activity export --scope project:entry-init-project --target hyperextract-i
 
 推荐把存储分成五层：
 
-| 层 | 形式 | 是否 canonical | 是否给 LLM 直接读 | 用途 |
-| --- | --- | --- | --- | --- |
-| 事实层 | `activity/events/**/*.jsonl` | 是 | 否 | 不可变事件、跨设备同步、审计 |
-| 内容层 | inbox、project page、blob、附件 | 部分是 | 通过 CLI 片段读取 | 原话、长文本、人工可读资料 |
-| 视图层 | Markdown index、timeline、daily review | 否 | 可以 | 人和 agent 的低成本入口 |
-| 全文索引层 | SQLite FTS、tantivy、vector index | 否 | 只读查询结果 | 搜索、召回、排序 |
-| 抽取层 | graphify、Hyper-Extract 输出 | 否 | 可以读报告/查询接口 | 图谱、强类型知识、推理入口 |
+| 层         | 形式                                   | 是否 canonical | 是否给 LLM 直接读   | 用途                         |
+| ---------- | -------------------------------------- | -------------- | ------------------- | ---------------------------- |
+| 事实层     | `activity/events/**/*.jsonl`           | 是             | 否                  | 不可变事件、跨设备同步、审计 |
+| 内容层     | inbox、project page、blob、附件        | 部分是         | 通过 CLI 片段读取   | 原话、长文本、人工可读资料   |
+| 视图层     | Markdown index、timeline、daily review | 否             | 可以                | 人和 agent 的低成本入口      |
+| 全文索引层 | SQLite FTS、tantivy、vector index      | 否             | 只读查询结果        | 搜索、召回、排序             |
+| 抽取层     | graphify、Hyper-Extract 输出           | 否             | 可以读报告/查询接口 | 图谱、强类型知识、推理入口   |
 
 其中只有事实层和用户明确保存的内容层是 source of truth。其他层都应该可删除、可重建。
 
@@ -501,27 +501,27 @@ templates/entry/
 
 模板选择：
 
-| 模板 | Auto-Type | 用途 |
-| --- | --- | --- |
-| `project_timeline` | AutoTemporalGraph | 项目事件、决策、里程碑 |
-| `decision_graph` | AutoGraph | 决策、依据、影响、后续动作 |
-| `conflict_case` | AutoHypergraph | 多设备/多人/多文件冲突 |
-| `delivery_matrix` | AutoModel 或 AutoGraph | CLI、skill、plugin、Flue 的关系 |
-| `device_repo_topology` | AutoGraph | 设备、repo、clone、remote、状态 |
+| 模板                   | Auto-Type              | 用途                            |
+| ---------------------- | ---------------------- | ------------------------------- |
+| `project_timeline`     | AutoTemporalGraph      | 项目事件、决策、里程碑          |
+| `decision_graph`       | AutoGraph              | 决策、依据、影响、后续动作      |
+| `conflict_case`        | AutoHypergraph         | 多设备/多人/多文件冲突          |
+| `delivery_matrix`      | AutoModel 或 AutoGraph | CLI、skill、plugin、Flue 的关系 |
+| `device_repo_topology` | AutoGraph              | 设备、repo、clone、remote、状态 |
 
 Hyper-Extract 的价值在于 schema 可声明、可版本化。模板应和 `entry` 的领域语言共同演进。
 
 ## 风险与防线
 
-| 风险 | 防线 |
-| --- | --- |
+| 风险                            | 防线                                                                              |
+| ------------------------------- | --------------------------------------------------------------------------------- |
 | LLM 直接读 JSONL 导致上下文膨胀 | skill/plugin 明确禁止，`.graphifyignore` 忽略 `activity/events/`，只通过 CLI 导出 |
-| 派生图谱被误当事实 | 所有派生输出标记 `derived_from`、`generated_at`、`tool/version` |
-| 抽取产生幻觉关系 | 使用 confidence，默认只把 `EXTRACTED` 回写轻量索引；`INFERRED/AMBIGUOUS` 只进报告 |
-| 外部工具格式变更 | adapter 层隔离，canonical JSONL 不依赖外部 schema |
-| 隐私泄露 | 导出前做 redaction；secret/token/cookie/env 不进入 corpus |
-| 派生物太大 | 放 `.cache/entry` 或 `activity/derived`，可清理重建 |
-| 增量 cursor 错乱 | cursor 只影响派生层；可全量重建 |
+| 派生图谱被误当事实              | 所有派生输出标记 `derived_from`、`generated_at`、`tool/version`                   |
+| 抽取产生幻觉关系                | 使用 confidence，默认只把 `EXTRACTED` 回写轻量索引；`INFERRED/AMBIGUOUS` 只进报告 |
+| 外部工具格式变更                | adapter 层隔离，canonical JSONL 不依赖外部 schema                                 |
+| 隐私泄露                        | 导出前做 redaction；secret/token/cookie/env 不进入 corpus                         |
+| 派生物太大                      | 放 `.cache/entry` 或 `activity/derived`，可清理重建                               |
+| 增量 cursor 错乱                | cursor 只影响派生层；可全量重建                                                   |
 
 ## 建议落地顺序
 

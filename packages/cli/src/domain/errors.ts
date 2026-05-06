@@ -25,7 +25,7 @@ const EXIT_CODES: Record<ErrorCode, number> = {
   ENTRY_WRITE_CONFLICT: 30,
   SHELL_COMMAND_FAILED: 40,
   FILESYSTEM_ERROR: 41,
-  UNSUPPORTED_EXPORT_TARGET: 50
+  UNSUPPORTED_EXPORT_TARGET: 50,
 };
 
 const RECOVERABLE: Record<ErrorCode, boolean> = {
@@ -39,7 +39,7 @@ const RECOVERABLE: Record<ErrorCode, boolean> = {
   ENTRY_WRITE_CONFLICT: true,
   SHELL_COMMAND_FAILED: true,
   FILESYSTEM_ERROR: false,
-  UNSUPPORTED_EXPORT_TARGET: true
+  UNSUPPORTED_EXPORT_TARGET: true,
 };
 
 export class EntryWorkflowError extends Error {
@@ -50,7 +50,7 @@ export class EntryWorkflowError extends Error {
   constructor(
     readonly code: ErrorCode,
     readonly humanMessageZh: string,
-    readonly details: Record<string, unknown> = {}
+    readonly details: Record<string, unknown> = {},
   ) {
     super(humanMessageZh);
     this.name = "EntryWorkflowError";
@@ -61,27 +61,31 @@ export class EntryWorkflowError extends Error {
 
 export const invalidInput = (error: z.ZodError): EntryWorkflowError =>
   new EntryWorkflowError("INVALID_INPUT", "输入参数不合法。", {
-    issues: error.issues
+    issues: error.issues,
   });
 
-export const filesystemError = (operation: string, path: string, cause: unknown): EntryWorkflowError =>
+export const filesystemError = (
+  operation: string,
+  path: string,
+  cause: unknown,
+): EntryWorkflowError =>
   new EntryWorkflowError("FILESYSTEM_ERROR", "文件系统操作失败。", {
     operation,
     path,
-    cause: formatCause(cause)
+    cause: formatCause(cause),
   });
 
 export const shellCommandFailed = (
   command: string,
   args: readonly string[],
   exitCode: number,
-  stderr: string
+  stderr: string,
 ): EntryWorkflowError =>
   new EntryWorkflowError("SHELL_COMMAND_FAILED", "外部命令执行失败。", {
     command,
     args,
     exitCode,
-    stderr
+    stderr,
   });
 
 export function errorToJson(error: unknown): Record<string, unknown> {
@@ -94,8 +98,8 @@ export function errorToJson(error: unknown): Record<string, unknown> {
         code: workflowError.code,
         messageZh: workflowError.humanMessageZh,
         recoverable: workflowError.recoverable,
-        details: workflowError.details
-      }
+        details: workflowError.details,
+      },
     };
   }
 
@@ -105,8 +109,8 @@ export function errorToJson(error: unknown): Record<string, unknown> {
       code: "UNKNOWN",
       messageZh: "发生未分类错误。",
       recoverable: false,
-      details: { cause: formatCause(error) }
-    }
+      details: { cause: formatCause(error) },
+    },
   };
 }
 
