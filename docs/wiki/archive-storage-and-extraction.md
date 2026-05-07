@@ -36,10 +36,10 @@ append-only jsonl 事实层
 它不适合直接给 LLM 全量读取。解决方式不是换格式，而是严格建立 CLI 边界：
 
 ```bash
-foyer activity query --project entry-init-project --since 2026-05-01 --json
-foyer activity context --project entry-init-project --budget 4000 --format markdown
-foyer activity export --scope project:entry-init-project --target graphify-corpus
-foyer activity export --scope project:entry-init-project --target hyperextract-input
+foyer activity query --project foyer-mono --since 2026-05-01 --json
+foyer activity context --project foyer-mono --budget 4000 --format markdown
+foyer activity export --scope project:foyer-mono --target graphify-corpus
+foyer activity export --scope project:foyer-mono --target hyperextract-input
 ```
 
 大模型看到的是查询结果、摘要、引用片段或派生文档，不是原始日志全集。
@@ -131,7 +131,7 @@ JSONL 仍是源头。派生层维护 cursor：
 .entry-derived/
   cursors/
     graphify-all-projects.json
-    hyperextract-entry-init-project.json
+    hyperextract-foyer-mono.json
 ```
 
 更新流程：
@@ -140,8 +140,8 @@ JSONL 仍是源头。派生层维护 cursor：
 foyer activity export --since-cursor graphify-all-projects --target graphify-corpus
 graphify .entry-derived/graphify/all-projects/corpus --update
 
-foyer activity export --since-cursor hyperextract-entry-init-project --target markdown-fragment
-he feed .entry-derived/hyperextract/entry-init-project/timeline new-fragment.md
+foyer activity export --since-cursor hyperextract-foyer-mono --target markdown-fragment
+he feed .entry-derived/hyperextract/foyer-mono/timeline new-fragment.md
 ```
 
 Hyper-Extract 的 `feed` 明确支持在已有 Knowledge Abstract 上增量加入新文档，并处理实体/关系合并；graphify 也提供 `--update` 和缓存机制。
@@ -185,7 +185,7 @@ graphify 可用于看冲突涉及哪些项目和概念；Hyper-Extract 可用于
 CLI：
 
 ```bash
-foyer search "Flue agent 交付形式" --project entry-init-project --limit 10 --json
+foyer search "Flue agent 交付形式" --project foyer-mono --limit 10 --json
 foyer get event <event-id> --format markdown
 ```
 
@@ -419,9 +419,9 @@ JSONL 事件可以保持小而稳定：
   "seq": 42,
   "ts": "2026-05-05T20:30:00+08:00",
   "type": "project.created",
-  "project": "entry-init-project",
+  "project": "foyer-mono",
   "lane": "agent_loop_research",
-  "summary": "创建 entry-init-project 项目，用于把 init-project skill 演进为多交付形式能力。",
+  "summary": "创建 foyer-mono 项目，用于把 init-project skill 演进为多交付形式能力。",
   "raw_ref": "inbox/2026/05/2026-05-05.md#raw-capture-...",
   "body_ref": "blobs/sha256/...",
   "entities": ["init-project", "Flue", "Skill", "CLI"],
@@ -453,7 +453,7 @@ JSONL 事件可以保持小而稳定：
 derived/graphify/all-projects/corpus/
   index.md
   projects/
-    entry-init-project.md
+    foyer-mono.md
   days/
     2026-05-05.md
   decisions/
@@ -465,7 +465,7 @@ derived/graphify/all-projects/corpus/
 ```markdown
 ---
 entry_scope: project
-project: entry-init-project
+project: foyer-mono
 source_events:
   - 01HX...
 source_refs:
@@ -473,7 +473,7 @@ source_refs:
 generated_at: 2026-05-05T21:00:00+08:00
 ---
 
-# entry-init-project
+# foyer-mono
 
 ## 目标
 
@@ -536,7 +536,7 @@ Hyper-Extract 的价值在于 schema 可声明、可版本化。模板应和 `en
 
 ## 当前项目的设计判断
 
-对 `entry-init-project` 而言，下一版目标可以补充为：
+对 `foyer-mono` 而言，下一版目标可以补充为：
 
 ```text
 存档层坚持 JSONL append-only；

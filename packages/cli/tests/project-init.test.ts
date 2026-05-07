@@ -238,7 +238,7 @@ describe("project init workflow", () => {
 });
 
 async function tempRoot(): Promise<string> {
-  const dir = await mkdtemp(path.join(os.tmpdir(), "entry-init-project-"));
+  const dir = await mkdtemp(path.join(os.tmpdir(), "foyer-mono-"));
   tempDirs.push(dir);
   return dir;
 }

@@ -1,9 +1,9 @@
 ---
-name: entry-init-project:init-project
+name: foyer-mono:init-project
 description: Claude Code plugin 入口。识别项目初始化请求，调用 foyer CLI dry-run/execute，不复制业务逻辑。
 ---
 
-# entry-init-project:init-project
+# foyer-mono:init-project
 
 优先调用仓库构建出的 `foyer` CLI：
 

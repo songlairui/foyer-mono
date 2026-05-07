@@ -3,7 +3,7 @@
 ## 只看计划
 
 ```bash
-foyer project init entry-init-project --desc "把 init-project 能力产品化为多交付形式系统" --dry-run --json
+foyer project init foyer-mono --desc "把 init-project 能力产品化为多交付形式系统" --dry-run --json
 ```
 
 ## 创建本地项目

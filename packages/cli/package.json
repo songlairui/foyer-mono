@@ -1,6 +1,6 @@
 {
-  "name": "entry-init-project",
-  "version": "1.0.0",
+  "name": "foyer-cli",
+  "version": "0.0.1",
   "description": "Foyer 项目落户 CLI 与 Effect workflows。",
   "keywords": [
     "cli",

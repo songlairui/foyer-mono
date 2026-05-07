@@ -181,7 +181,7 @@ activity/derived/
 ### 7. 共享项目结构
 
 ```text
-entry-init-project/
+foyer-mono/
   packages/
     cli/
       src/

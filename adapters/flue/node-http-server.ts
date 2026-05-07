@@ -30,9 +30,7 @@ const server = createServer(async (request, response) => {
 });
 
 server.listen(port, "127.0.0.1", () => {
-  process.stderr.write(
-    `entry-init-project Flue HTTP adapter listening on http://127.0.0.1:${port}\n`,
-  );
+  process.stderr.write(`foyer-mono Flue HTTP adapter listening on http://127.0.0.1:${port}\n`);
 });
 
 function readBody(request: NodeJS.ReadableStream): Promise<string> {

@@ -1,6 +1,6 @@
 # Claude Code Plugin 调研结论
 
-当前暂无必要把 `entry-init-project` 做成 Claude Code plugin。
+当前暂无必要把 `foyer-mono` 做成 Claude Code plugin。
 
 原因：
 

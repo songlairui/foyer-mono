@@ -1,7 +1,7 @@
 {
   "preCommand": [
     {
-      "name": "entry-init-project-dry-run-first",
+      "name": "foyer-mono-dry-run-first",
       "description": "涉及项目初始化时优先使用 foyer project init --dry-run --json。"
     }
   ]

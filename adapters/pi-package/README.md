@@ -1,6 +1,6 @@
 # Pi Package / Extension 调研结论
 
-当前暂无必要把 `entry-init-project` 做成 Pi package 或 extension。
+当前暂无必要把 `foyer-mono` 做成 Pi package 或 extension。
 
 原因：
 

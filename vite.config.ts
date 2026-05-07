@@ -4,6 +4,8 @@ const ignoredGeneratedPaths = [
   ".git/**",
   ".sc/**",
   ".flue-dist/**",
+  ".flue/**",
+  "adapters/**",
   "dist/**",
   "node_modules/**",
   "packages/*/dist/**",
