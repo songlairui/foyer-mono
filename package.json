@@ -12,6 +12,11 @@
     "flue:run": "flue run project-init --target node --output .flue-dist",
     "prepare": "vp config"
   },
+  "dependencies": {
+    "@opentui/core": "^0.2.4",
+    "@opentui/react": "^0.2.4",
+    "react": "^19.2.6"
+  },
   "devDependencies": {
     "@flue/cli": "^0.3.10",
     "@flue/sdk": "^0.3.10",

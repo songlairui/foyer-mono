@@ -10,6 +10,7 @@ const ignoredGeneratedPaths = [
   "node_modules/**",
   "packages/*/dist/**",
   "packages/*/node_modules/**",
+  "packages/*/tui/**",
 ];
 
 export default defineConfig({

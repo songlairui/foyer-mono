@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 import { Command } from "commander";
+import { spawn } from "node:child_process";
+import { writeFileSync, unlinkSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { Effect } from "effect";
-import { readFileSync } from "node:fs";
 import {
   appendActivity,
   activityContext,
@@ -271,8 +274,13 @@ repo
   .option("--foyer-root <path>", "Foyer 数据根目录")
   .option("--entry-root <path>", "兼容旧参数：旧数据根目录")
   .option("--json", "输出稳定 JSON")
+  .option("--tui", "使用交互式终端界面展示")
   .description("列出已经落户/启动过的项目")
   .action(async (options) => {
+    if (options.tui) {
+      await runTui(listProjects({ limit: options.limit, entryRoot: rootOption(options) }));
+      return;
+    }
     await run(listProjects({ limit: options.limit, entryRoot: rootOption(options) }), options);
   });
 
@@ -461,6 +469,46 @@ function writeSuccess(value: unknown, options: OutputMode): void {
       ? String((value as { humanSummaryZh: unknown }).humanSummaryZh)
       : "命令执行完成。";
   process.stdout.write(`${humanSummaryZh}\n`);
+}
+
+async function runTui<A, E>(effect: Effect.Effect<A, E, RuntimeServices>): Promise<void> {
+  const runnable = Effect.provide(effect, NodeServicesLive);
+  const exit = await Effect.runPromiseExit(runnable);
+
+  if (exit._tag === "Failure") {
+    const json = errorToJson(exit);
+    process.exitCode = exitCodeFor(exit);
+    const error = json.error as { messageZh?: string };
+    process.stderr.write(`${error.messageZh ?? "命令失败。"}\n`);
+    return;
+  }
+
+  const tmpFile = join(tmpdir(), `foyer-repo-list-${Date.now()}.json`);
+  writeFileSync(tmpFile, JSON.stringify(exit.value));
+
+  const tuiScript = join(__dirname, "..", "..", "tui", "repo-list.ts");
+
+  await new Promise<void>((resolve) => {
+    const child = spawn("bun", ["run", tuiScript, tmpFile], {
+      stdio: "inherit",
+      env: { ...process.env },
+    });
+
+    child.on("error", (err) => {
+      unlinkSync(tmpFile);
+      process.stderr.write(`无法启动 TUI：${err.message}（请确认已安装 Bun）\n`);
+      resolve();
+    });
+
+    child.on("close", () => {
+      try {
+        unlinkSync(tmpFile);
+      } catch {
+        // temp file may already be cleaned up
+      }
+      resolve();
+    });
+  });
 }
 
 function parseInteger(value: string): number {
