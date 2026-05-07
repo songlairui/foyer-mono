@@ -2,9 +2,11 @@
 id: 20260507-1019-ff5ec4
 created: 2026-05-07T10:19:00+08:00
 updated: 2026-05-07T10:40:00+08:00
+completed: 2026-05-07
 title: foyer repo prepare — 跨设备按需克隆
 type: feat
 tags: [cli, multi-device, workspace]
+status: done
 ---
 
 ## 起意
