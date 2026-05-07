@@ -25,6 +25,7 @@ export const ProjectInitRequestSchema = z.object({
   createGithub: z.boolean().default(false),
   dryRun: z.boolean().default(false),
   deviceName: z.string().optional(),
+  initFrom: z.string().optional(),
 });
 
 export type ProjectInitRequest = z.infer<typeof ProjectInitRequestSchema>;
@@ -161,6 +162,7 @@ export const ProjectListItemSchema = z.object({
   owner: OwnerSchema.optional(),
   projectPath: z.string().optional(),
   repositoryUrl: z.string().optional(),
+  initFrom: z.string().optional(),
   createdAt: z.string(),
   createdEventId: z.string(),
   latestEventAt: z.string().optional(),

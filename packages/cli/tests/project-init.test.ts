@@ -21,14 +21,14 @@ describe("project init workflow", () => {
     const root = await tempRoot();
     const entryRoot = path.join(root, "entry");
     await mkdir(entryRoot, { recursive: true });
-    const plan = await Effect.runPromise(
+    const plan = await runWithServices(
       planProjectInit({
         slug: "demo-project",
         description: "用于验证 dry-run 的项目",
         projectsRoot: path.join(root, "projects"),
         entryRoot,
         dryRun: true,
-      }).pipe(Effect.provide(fixedClock(new Date("2026-05-05T12:00:00.000Z")))),
+      }),
     );
 
     expect(plan.kind).toBe("project-init-plan");
@@ -63,6 +63,8 @@ describe("project init workflow", () => {
 
     expect(result.kind).toBe("project-init-result");
     expect(commands).toEqual([
+      "git remote get-url origin",
+      "git rev-parse --show-toplevel",
       "git init",
       "git add README.md docs/kickoff/.gitkeep",
       "git commit -m init project",

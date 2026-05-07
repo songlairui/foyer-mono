@@ -1,3 +1,4 @@
+import os from "node:os";
 import path from "node:path";
 import { Effect } from "effect";
 import {
@@ -30,18 +31,29 @@ import { writeActivityFact } from "./activity-store";
 
 export function planProjectInit(
   input: unknown,
-): Effect.Effect<ProjectInitPlan, EntryWorkflowError, Clock> {
+): Effect.Effect<ProjectInitPlan, EntryWorkflowError, Clock | FileSystem | Shell> {
   return Effect.gen(function* () {
     const parsed = ProjectInitRequestSchema.safeParse(input);
     if (!parsed.success) return yield* Effect.fail(invalidInput(parsed.error));
 
-    const request = parsed.data;
+    let request = parsed.data;
     const config = resolveConfig(request);
+
+    if (request.initFrom === undefined) {
+      const events = yield* Effect.catchAll(
+        queryActivity({ entryRoot: config.entryRoot, limit: 1000 }),
+        () => Effect.succeed([] as ActivityEvent[]),
+      );
+      const detected = yield* autoDetectInitFrom(events);
+      if (detected) request = { ...request, initFrom: detected };
+    }
+
     const clock = yield* Clock;
     const now = yield* clock.now();
     const targetProjectPath = projectPath(config, request.slug);
     const paths = entryPaths(config, request.slug, now);
     const steps = planSteps(request, targetProjectPath, paths.eventFile);
+    const initFromNote = request.initFrom ? `init-from: ${request.initFrom}` : undefined;
     const plan: ProjectInitPlan = {
       kind: "project-init-plan",
       request: { ...request, dryRun: true },
@@ -49,9 +61,12 @@ export function planProjectInit(
       projectPath: targetProjectPath,
       entryPaths: paths,
       steps,
-      warnings: request.createGithub
-        ? []
-        : ["未启用 GitHub 创建；执行时只创建本地仓库和 Foyer 记录。"],
+      warnings: [
+        ...(request.createGithub
+          ? []
+          : ["未启用 GitHub 创建；执行时只创建本地仓库和 Foyer 记录。"]),
+        ...(initFromNote ? [initFromNote] : []),
+      ],
       humanSummaryZh: `将初始化项目 ${request.slug}，目标目录为 ${targetProjectPath} 。dry-run 不会产生副作用。`,
     };
 
@@ -66,8 +81,19 @@ export function executeProjectInit(
     const parsed = ProjectInitRequestSchema.safeParse(input);
     if (!parsed.success) return yield* Effect.fail(invalidInput(parsed.error));
 
-    const request: ProjectInitRequest = { ...parsed.data, dryRun: false };
-    const config = resolveConfig(request);
+    let requestData = { ...parsed.data, dryRun: false };
+    const config = resolveConfig(requestData);
+
+    if (requestData.initFrom === undefined) {
+      const events = yield* Effect.catchAll(
+        queryActivity({ entryRoot: config.entryRoot, limit: 1000 }),
+        () => Effect.succeed([] as ActivityEvent[]),
+      );
+      const detected = yield* autoDetectInitFrom(events);
+      if (detected) requestData = { ...requestData, initFrom: detected };
+    }
+
+    const request: ProjectInitRequest = requestData;
     const fs = yield* FileSystem;
     const shell = yield* Shell;
     const clock = yield* Clock;
@@ -160,6 +186,7 @@ export function executeProjectInit(
         description: request.description,
         projectPath: targetProjectPath,
         repositoryUrl,
+        initFrom: request.initFrom,
       },
       now,
     });
@@ -318,6 +345,7 @@ export function listProjects(
         owner: event.owner,
         projectPath: stringData(event, "projectPath"),
         repositoryUrl: stringData(event, "repositoryUrl"),
+        initFrom: stringData(event, "initFrom"),
         createdAt: event.ts,
         createdEventId: event.id,
         latestEventAt: latest?.ts,
@@ -363,6 +391,56 @@ function stringData(event: ActivityEvent, key: string): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
+function normalizeRepoUrl(url: string): string {
+  return url.replace(/^git@github\.com:/, "https://github.com/").replace(/\.git$/, "");
+}
+
+function extractUsernameRepo(remote: string): string | undefined {
+  const normalized = normalizeRepoUrl(remote);
+  const match = normalized.match(/^https?:\/\/github\.com\/([^/]+\/[^/?#]+)$/);
+  return match?.[1];
+}
+
+function autoDetectInitFrom(
+  events: ActivityEvent[],
+): Effect.Effect<string | undefined, never, Shell> {
+  return Effect.gen(function* () {
+    const shell = yield* Shell;
+
+    const remoteResult = yield* Effect.catchAll(
+      shell.run("git", ["remote", "get-url", "origin"], { allowFailure: true }),
+      () => Effect.succeed({ exitCode: 1, stdout: "", stderr: "" }),
+    );
+
+    const remote = remoteResult.exitCode === 0 ? remoteResult.stdout.trim() : "";
+
+    if (remote) {
+      const normalizedRemote = normalizeRepoUrl(remote);
+      for (const event of events) {
+        if (event.event !== "project.created" && event.event !== "project.initialized") continue;
+        const repoUrl = stringData(event, "repositoryUrl");
+        if (repoUrl && normalizeRepoUrl(repoUrl) === normalizedRemote) {
+          return event.project;
+        }
+      }
+      const usernameRepo = extractUsernameRepo(remote);
+      if (usernameRepo) return usernameRepo;
+    }
+
+    const rootResult = yield* Effect.catchAll(
+      shell.run("git", ["rev-parse", "--show-toplevel"], { allowFailure: true }),
+      () => Effect.succeed({ exitCode: 1, stdout: "", stderr: "" }),
+    );
+    if (rootResult.exitCode === 0 && rootResult.stdout.trim()) {
+      const root = rootResult.stdout.trim();
+      const home = os.homedir();
+      return root.startsWith(`${home}/`) ? root.slice(home.length + 1) : root;
+    }
+
+    return undefined;
+  });
+}
+
 function renderProjectList(projects: ProjectListItem[]): string {
   if (projects.length === 0) return "暂无已启动项目。\n";
   return (
@@ -374,6 +452,7 @@ function renderProjectList(projects: ProjectListItem[]): string {
           `  ${project.description}`,
           project.projectPath ? `  path: ${project.projectPath}` : undefined,
           project.repositoryUrl ? `  repo: ${project.repositoryUrl}` : undefined,
+          project.initFrom ? `  init-from: ${project.initFrom}` : undefined,
         ]
           .filter((line): line is string => Boolean(line))
           .join("\n"),

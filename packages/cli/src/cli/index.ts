@@ -43,6 +43,7 @@ project
   .option("--github-visibility <visibility>", "private / public / internal", "private")
   .option("--github", "创建 GitHub 仓库并 push", false)
   .option("--dry-run", "只打印计划，不产生副作用", false)
+  .option("--init-from <value>", "发起位置标识，格式为 username/repo 或 Foyer slug")
   .option("--json", "输出稳定 JSON")
   .action(async (slug: string, options: Record<string, unknown>) => {
     const input = {
@@ -56,6 +57,7 @@ project
       githubVisibility: options.githubVisibility,
       createGithub: Boolean(options.github),
       dryRun: Boolean(options.dryRun),
+      initFrom: options.initFrom as string | undefined,
     };
     if (options.dryRun) {
       await run(planProjectInit(input), options);

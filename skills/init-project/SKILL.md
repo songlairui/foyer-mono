@@ -11,20 +11,22 @@ description: 零配置项目落户入口。识别创建项目/初始化 repo/登
 
 1. 提取或生成 `slug`、`description`、`lane`、`owner`。
 2. 参数不清楚时先运行 `foyer project init --help`。
-3. 调用 dry-run：
+3. 调用 dry-run（CLI 会自动从 cwd 探测 `init-from`，并在 warnings 中展示结果）：
 
-```bash
-foyer project init <slug> --desc "<中文描述>" --lane <lane> --owner <owner> --github --dry-run --json
-```
+   ```bash
+   foyer project init <slug> --desc "<中文描述>" --lane <lane> --owner <owner> --github --dry-run --json
+   ```
 
 4. 如果计划涉及 `--github`、push、覆盖、secret、不可逆操作，先向用户确认。
 5. 执行：
 
-```bash
-foyer project init <slug> --desc "<中文描述>" --lane <lane> --owner <owner> --github --json
-```
+   ```bash
+   foyer project init <slug> --desc "<中文描述>" --lane <lane> --owner <owner> --github --json
+   ```
 
 6. 用 CLI 返回的 JSON 生成中文摘要。
+
+> `--init-from <value>` 可手动传入来覆盖自动探测结果。
 
 ## 关键说明
 
