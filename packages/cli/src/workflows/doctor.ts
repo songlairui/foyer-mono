@@ -3,6 +3,7 @@ import { Effect } from "effect";
 import type { ActivityEvent } from "../domain/contracts";
 import type { EntryWorkflowError } from "../domain/errors";
 import { resolveConfig } from "../domain/paths";
+import { repoRootsList } from "../domain/scan-roots";
 import { FileSystem, Shell } from "../services/context";
 import { parseActivityEvent } from "./activity";
 import { repoDevices, repoStatus } from "./repo";
@@ -15,6 +16,7 @@ export interface DoctorReport {
     entryRootExists: boolean;
     projectsRoot: string;
     projectsRootExists: boolean;
+    scanRoots: string[];
   };
   facts: {
     eventFiles: number;
@@ -62,6 +64,9 @@ export function runDoctor(input: {
     const warnings: string[] = [];
     const entryRootExists = yield* fs.exists(config.entryRoot);
     const projectsRootExists = yield* fs.exists(config.projectsRoot);
+    const scanRootsResult = yield* Effect.catchAll(repoRootsList(), () =>
+      Effect.succeed({ roots: [config.projectsRoot] }),
+    );
 
     if (!entryRootExists) warnings.push(`Foyer 数据根目录不存在：${config.entryRoot}`);
     if (!projectsRootExists) warnings.push(`projects 根目录不存在：${config.projectsRoot}`);
@@ -166,6 +171,7 @@ export function runDoctor(input: {
         entryRootExists,
         projectsRoot: config.projectsRoot,
         projectsRootExists,
+        scanRoots: scanRootsResult.roots,
       },
       facts: {
         eventFiles: eventFiles.length,

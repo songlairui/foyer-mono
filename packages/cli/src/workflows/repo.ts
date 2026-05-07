@@ -33,8 +33,39 @@ export function repoDevices(input: { projectsRoot?: string; deviceName?: string 
   });
 }
 
+export type RepoDevice = { device: string; repo: string; path: string };
+export type RepoDeviceMulti = RepoDevice & { scanRoot: string };
+
+export function repoDevicesMulti(input: {
+  roots: string[];
+  deviceName?: string;
+}): Effect.Effect<RepoDeviceMulti[], EntryWorkflowError, FileSystem> {
+  return Effect.gen(function* () {
+    const allResults = yield* Effect.forEach(
+      input.roots,
+      (root) =>
+        repoDevices({ projectsRoot: root, deviceName: input.deviceName }).pipe(
+          Effect.map((repos) => repos.map((r) => ({ ...r, scanRoot: root }))),
+        ),
+      { concurrency: "unbounded" },
+    );
+    const seen = new Set<string>();
+    const merged: RepoDeviceMulti[] = [];
+    for (const repos of allResults) {
+      for (const repo of repos) {
+        if (!seen.has(repo.path)) {
+          seen.add(repo.path);
+          merged.push(repo);
+        }
+      }
+    }
+    return merged.sort((a, b) => a.path.localeCompare(b.path));
+  });
+}
+
 export function repoStatus(input: {
   projectsRoot?: string;
+  roots?: string[];
   all?: boolean;
   deviceName?: string;
 }): Effect.Effect<
@@ -43,7 +74,9 @@ export function repoStatus(input: {
   FileSystem | Shell
 > {
   return Effect.gen(function* () {
-    const repos = yield* repoDevices(input);
+    const repos = input.roots
+      ? yield* repoDevicesMulti({ roots: input.roots, deviceName: input.deviceName })
+      : yield* repoDevices(input);
     const shell = yield* Shell;
     const statuses = [];
     for (const repo of repos) {

@@ -17,7 +17,14 @@ import {
   planProjectInit,
   upsertProjectIndex,
 } from "../workflows/project-init";
-import { repoDevices, repoManifests, repoPrepare, repoStatus } from "../workflows/repo";
+import {
+  repoDevices,
+  repoDevicesMulti,
+  repoManifests,
+  repoPrepare,
+  repoStatus,
+} from "../workflows/repo";
+import { repoRootsAdd, repoRootsList, repoRootsRemove } from "../domain/scan-roots";
 import { Clock, FileSystem, NodeServicesLive, Shell } from "../services/context";
 import { errorToJson, exitCodeFor } from "../domain/errors";
 
@@ -27,7 +34,9 @@ const program = new Command();
 
 program.name("foyer").description("Foyer 项目落户、activity 记录和派生导出 CLI").version("0.1.0");
 
-const project = program.command("project").description("项目初始化和索引命令");
+const project = program
+  .command("project")
+  .description("项目初始化和索引命令（已废弃，project 概念将重新设计）");
 
 project
   .command("init")
@@ -82,8 +91,9 @@ project
   .option("--foyer-root <path>", "Foyer 数据根目录")
   .option("--entry-root <path>", "兼容旧参数：旧数据根目录")
   .option("--json", "输出稳定 JSON")
-  .description("列出已经落户/启动过的项目")
+  .description("列出已经落户/启动过的项目（已废弃，请使用 foyer repo list）")
   .action(async (options) => {
+    process.stderr.write("警告：foyer project list 已废弃，请使用 foyer repo list\n");
     await run(listProjects({ limit: options.limit, entryRoot: rootOption(options) }), options);
   });
 
@@ -253,25 +263,82 @@ activity
     );
   });
 
-const repo = program.command("repo").description("设备和仓库状态查询");
+const repo = program.command("repo").description("仓库扫描、状态查询和根目录管理");
+
+repo
+  .command("list")
+  .option("--limit <n>", "最大返回数量", parseInteger, 1000)
+  .option("--foyer-root <path>", "Foyer 数据根目录")
+  .option("--entry-root <path>", "兼容旧参数：旧数据根目录")
+  .option("--json", "输出稳定 JSON")
+  .description("列出已经落户/启动过的项目")
+  .action(async (options) => {
+    await run(listProjects({ limit: options.limit, entryRoot: rootOption(options) }), options);
+  });
+
+const roots = repo.command("roots").description("管理多目录扫描根列表");
+
+roots
+  .command("list")
+  .option("--json", "输出稳定 JSON")
+  .description("列出当前注册的扫描根目录")
+  .action(async (options) => {
+    await run(repoRootsList(), options);
+  });
+
+roots
+  .command("add")
+  .argument("<path>", "要添加的根目录路径（支持 ~ 前缀）")
+  .option("--json", "输出稳定 JSON")
+  .description("注册新的扫描根目录")
+  .action(async (rootPath, options) => {
+    await run(repoRootsAdd(rootPath), options);
+  });
+
+roots
+  .command("remove")
+  .argument("<path>", "要移除的根目录路径（支持 ~ 前缀）")
+  .option("--json", "输出稳定 JSON")
+  .description("移除已注册的扫描根目录（至少保留一个）")
+  .action(async (rootPath, options) => {
+    await run(repoRootsRemove(rootPath), options);
+  });
 
 repo
   .command("devices")
-  .option("--projects-root <path>", "项目根目录")
+  .option("--projects-root <path>", "项目根目录（单根模式，不指定则用默认）")
+  .option("--all-roots", "扫描所有已注册的根目录", false)
   .option("--json", "输出稳定 JSON")
   .description("扫描当前设备上的项目仓库")
   .action(async (options) => {
-    await run(repoDevices({ projectsRoot: options.projectsRoot }), options);
+    if (options.allRoots) {
+      await run(
+        repoRootsList().pipe(Effect.flatMap((r) => repoDevicesMulti({ roots: r.roots }))),
+        options,
+      );
+    } else {
+      await run(repoDevices({ projectsRoot: options.projectsRoot }), options);
+    }
   });
 
 repo
   .command("status")
   .option("--all", "扫描所有仓库", true)
-  .option("--projects-root <path>", "项目根目录")
+  .option("--projects-root <path>", "项目根目录（单根模式）")
+  .option("--all-roots", "扫描所有已注册的根目录", false)
   .option("--json", "输出稳定 JSON")
   .description("查询项目仓库 git status")
   .action(async (options) => {
-    await run(repoStatus({ projectsRoot: options.projectsRoot, all: options.all }), options);
+    if (options.allRoots) {
+      await run(
+        repoRootsList().pipe(
+          Effect.flatMap((r) => repoStatus({ roots: r.roots, all: options.all })),
+        ),
+        options,
+      );
+    } else {
+      await run(repoStatus({ projectsRoot: options.projectsRoot, all: options.all }), options);
+    }
   });
 
 repo
