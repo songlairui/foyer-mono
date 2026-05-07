@@ -17,7 +17,7 @@ import {
   planProjectInit,
   upsertProjectIndex,
 } from "../workflows/project-init";
-import { repoDevices, repoManifests, repoStatus } from "../workflows/repo";
+import { repoDevices, repoManifests, repoPrepare, repoStatus } from "../workflows/repo";
 import { Clock, FileSystem, NodeServicesLive, Shell } from "../services/context";
 import { errorToJson, exitCodeFor } from "../domain/errors";
 
@@ -253,6 +253,28 @@ repo
   .description("通过 CLI 扫描 activity/manifests，供跨设备拼接使用")
   .action(async (options) => {
     await run(repoManifests({ entryRoot: rootOption(options) }), options);
+  });
+
+repo
+  .command("prepare")
+  .argument("<slug>", "kebab-case 项目名")
+  .option("--projects-root <path>", "项目根目录")
+  .option("--foyer-root <path>", "Foyer 数据根目录")
+  .option("--entry-root <path>", "兼容旧参数：旧数据根目录")
+  .option("--dry-run", "只打印计划，不产生副作用", false)
+  .option("--json", "输出稳定 JSON")
+  .description("确保指定项目仓库在本地就绪，未 clone 则自动 clone")
+  .action(async (slug, options) => {
+    await run(
+      repoPrepare({
+        slug,
+        projectsRoot: options.projectsRoot,
+        foyerRoot: rootOption(options),
+        entryRoot: rootOption(options),
+        dryRun: Boolean(options.dryRun),
+      }),
+      options,
+    );
   });
 
 program

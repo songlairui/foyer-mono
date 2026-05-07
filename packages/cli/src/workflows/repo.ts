@@ -1,8 +1,14 @@
 import path from "node:path";
 import { Effect } from "effect";
 import { EntryWorkflowError } from "../domain/errors";
-import { resolveConfig } from "../domain/paths";
+import {
+  RepoPrepareRequestSchema,
+  RepoPrepareResultSchema,
+  type RepoPrepareResult,
+} from "../domain/contracts";
+import { resolveConfig, projectPath } from "../domain/paths";
 import { FileSystem, Shell } from "../services/context";
+import { listProjects } from "./project-init";
 
 export function repoDevices(input: { projectsRoot?: string; deviceName?: string }) {
   return Effect.gen(function* () {
@@ -74,5 +80,95 @@ export function repoManifests(input: { entryRoot?: string }) {
       }
     }
     return manifests;
+  });
+}
+
+export function repoPrepare(
+  input: unknown,
+): Effect.Effect<RepoPrepareResult, EntryWorkflowError, FileSystem | Shell> {
+  return Effect.gen(function* () {
+    const parsed = RepoPrepareRequestSchema.safeParse(input);
+    if (!parsed.success) {
+      return yield* Effect.fail(
+        new EntryWorkflowError("INVALID_INPUT", "输入参数不合法。", {
+          issues: parsed.error.issues,
+        }),
+      );
+    }
+
+    const request = parsed.data;
+    const config = resolveConfig({
+      projectsRoot: request.projectsRoot,
+      foyerRoot: request.foyerRoot,
+      entryRoot: request.entryRoot,
+    });
+
+    const list = yield* listProjects({
+      entryRoot: config.entryRoot,
+      limit: 1000,
+    });
+
+    const project = list.projects.find((p) => p.slug === request.slug);
+    if (!project) {
+      return yield* Effect.fail(
+        new EntryWorkflowError("ENTRY_TARGET_MISSING", `未找到项目 ${request.slug}。`, {
+          slug: request.slug,
+        }),
+      );
+    }
+
+    const targetPath = projectPath(config, request.slug);
+    const devices = yield* repoDevices({ projectsRoot: config.projectsRoot });
+    const alreadyCloned = devices.some((d) => d.repo === request.slug);
+
+    if (alreadyCloned) {
+      const result: RepoPrepareResult = {
+        kind: "repo-prepare-result",
+        slug: request.slug,
+        projectPath: targetPath,
+        action: "already-ready",
+        humanSummaryZh: `${request.slug} 已就绪于 ${targetPath}。`,
+      };
+      return RepoPrepareResultSchema.parse(result);
+    }
+
+    if (!project.repositoryUrl) {
+      return yield* Effect.fail(
+        new EntryWorkflowError(
+          "NETWORK_FAILURE",
+          `项目 ${request.slug} 没有 repositoryUrl，无法 clone。`,
+          { slug: request.slug },
+        ),
+      );
+    }
+
+    if (request.dryRun) {
+      const result: RepoPrepareResult = {
+        kind: "repo-prepare-result",
+        slug: request.slug,
+        projectPath: targetPath,
+        repositoryUrl: project.repositoryUrl,
+        action: "would-clone",
+        humanSummaryZh: `将 clone ${request.slug} 从 ${project.repositoryUrl} 到 ${targetPath}。`,
+      };
+      return RepoPrepareResultSchema.parse(result);
+    }
+
+    const shell = yield* Shell;
+    if (!(yield* shell.commandExists("git"))) {
+      return yield* Effect.fail(new EntryWorkflowError("GIT_UNAVAILABLE", "未找到 git 命令。"));
+    }
+
+    yield* shell.run("git", ["clone", project.repositoryUrl, targetPath]);
+
+    const result: RepoPrepareResult = {
+      kind: "repo-prepare-result",
+      slug: request.slug,
+      projectPath: targetPath,
+      repositoryUrl: project.repositoryUrl,
+      action: "cloned",
+      humanSummaryZh: `已 clone ${request.slug} 到 ${targetPath}。`,
+    };
+    return RepoPrepareResultSchema.parse(result);
   });
 }

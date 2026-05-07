@@ -174,3 +174,24 @@ export const ActivityExportSchema = z.object({
 });
 
 export type ActivityExport = z.infer<typeof ActivityExportSchema>;
+
+export const RepoPrepareRequestSchema = z.object({
+  slug: ProjectSlugSchema,
+  projectsRoot: z.string().optional(),
+  foyerRoot: z.string().optional(),
+  entryRoot: z.string().optional(),
+  dryRun: z.boolean().default(false),
+});
+
+export type RepoPrepareRequest = z.infer<typeof RepoPrepareRequestSchema>;
+
+export const RepoPrepareResultSchema = z.object({
+  kind: z.literal("repo-prepare-result"),
+  slug: z.string(),
+  projectPath: z.string(),
+  repositoryUrl: z.string().optional(),
+  action: z.enum(["cloned", "already-ready", "would-clone"]),
+  humanSummaryZh: z.string(),
+});
+
+export type RepoPrepareResult = z.infer<typeof RepoPrepareResultSchema>;
