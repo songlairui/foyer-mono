@@ -10,7 +10,7 @@ import {
   searchActivity,
 } from "../workflows/activity";
 import { runDoctor } from "../workflows/doctor";
-import { appendInbox } from "../workflows/inbox";
+import { appendInbox, sendInbox } from "../workflows/inbox";
 import {
   executeProjectInit,
   listProjects,
@@ -125,6 +125,33 @@ inbox
         project: options.project,
         rawFile: options.rawFile,
         text: options.text,
+        entryRoot: rootOption(options),
+      }),
+      options,
+    );
+  });
+
+inbox
+  .command("send")
+  .argument("<slug>", "目标项目 slug")
+  .requiredOption("--type <type>", "消息类型: feature-request | feedback | idea | notify")
+  .requiredOption("--title <text>", "条目标题")
+  .option("--text <text>", "正文内容")
+  .option("--raw-file <path>", "原始 md 文件路径")
+  .option("--source-project <slug>", "来源项目 slug")
+  .option("--foyer-root <path>", "Foyer 数据根目录")
+  .option("--entry-root <path>", "兼容旧参数：旧数据根目录")
+  .option("--json", "输出稳定 JSON")
+  .description("向指定项目的 _inbox/tapped/ 投递一条信息条目")
+  .action(async (slug, options) => {
+    await run(
+      sendInbox({
+        targetSlug: slug,
+        type: options.type,
+        title: options.title,
+        text: options.text,
+        rawFile: options.rawFile,
+        sourceProject: options.sourceProject,
         entryRoot: rootOption(options),
       }),
       options,

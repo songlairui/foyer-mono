@@ -20,6 +20,8 @@ export function appendActivity(input: {
   project?: string;
   summary: string;
   lane?: string;
+  owner?: ActivityEvent["owner"];
+  data?: Record<string, unknown>;
 }): Effect.Effect<
   { eventFile: string; activityEvent: ActivityEvent; humanSummaryZh: string },
   EntryWorkflowError,
@@ -48,11 +50,12 @@ export function appendActivity(input: {
       event: input.event,
       project: input.project,
       lane: input.lane,
+      owner: input.owner,
       summary: input.summary,
       raw_ref: relativeToEntry(config, eventFile),
       source: "foyer activity append",
       parents: [],
-      data: {},
+      data: input.data ?? {},
     };
     const digest = hashObject(eventBase);
     const activityEvent: ActivityEvent = {
