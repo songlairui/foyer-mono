@@ -72,12 +72,43 @@ export const ActivityEventTypeSchema = z.enum([
   "project.created",
   "project.initialized",
   "inbox.appended",
+  "inbox.sent",
   "project.indexed",
   "decision.recorded",
   "activity.exported",
 ]);
 
 export type ActivityEventType = z.infer<typeof ActivityEventTypeSchema>;
+
+export const SendInboxRequestSchema = z
+  .object({
+    targetSlug: ProjectSlugSchema,
+    type: z.enum(["feature-request", "feedback", "idea", "notify"]),
+    title: z.string().min(1).max(200),
+    text: z.string().optional(),
+    rawFile: z.string().optional(),
+    sourceProject: z.string().optional(),
+    foyerRoot: z.string().optional(),
+    entryRoot: z.string().optional(),
+    deviceName: z.string().optional(),
+  })
+  .refine((data) => data.text || data.rawFile, {
+    message: "必须提供 text 或 rawFile 之一",
+    path: ["text"],
+  });
+
+export type SendInboxRequest = z.infer<typeof SendInboxRequestSchema>;
+
+export const SendInboxResultSchema = z.object({
+  kind: z.literal("send-inbox-result"),
+  targetSlug: z.string(),
+  targetFile: z.string(),
+  type: z.string(),
+  title: z.string(),
+  humanSummaryZh: z.string(),
+});
+
+export type SendInboxResult = z.infer<typeof SendInboxResultSchema>;
 
 export const ActivityEventSchema = z.object({
   id: z.string(),

@@ -12,7 +12,9 @@ export type ErrorCode =
   | "ENTRY_WRITE_CONFLICT"
   | "SHELL_COMMAND_FAILED"
   | "FILESYSTEM_ERROR"
-  | "UNSUPPORTED_EXPORT_TARGET";
+  | "UNSUPPORTED_EXPORT_TARGET"
+  | "TARGET_NOT_LOCAL"
+  | "FILE_ALREADY_EXISTS";
 
 const EXIT_CODES: Record<ErrorCode, number> = {
   INVALID_INPUT: 2,
@@ -26,6 +28,8 @@ const EXIT_CODES: Record<ErrorCode, number> = {
   SHELL_COMMAND_FAILED: 40,
   FILESYSTEM_ERROR: 41,
   UNSUPPORTED_EXPORT_TARGET: 50,
+  TARGET_NOT_LOCAL: 60,
+  FILE_ALREADY_EXISTS: 61,
 };
 
 const RECOVERABLE: Record<ErrorCode, boolean> = {
@@ -40,6 +44,8 @@ const RECOVERABLE: Record<ErrorCode, boolean> = {
   SHELL_COMMAND_FAILED: true,
   FILESYSTEM_ERROR: false,
   UNSUPPORTED_EXPORT_TARGET: true,
+  TARGET_NOT_LOCAL: true,
+  FILE_ALREADY_EXISTS: true,
 };
 
 export class EntryWorkflowError extends Error {
