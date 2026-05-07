@@ -14,17 +14,22 @@ description: 零配置项目落户入口。识别创建项目/初始化 repo/登
 3. 调用 dry-run：
 
 ```bash
-foyer project init <slug> --desc "<中文描述>" --lane <lane> --owner <owner> --dry-run --json
+foyer project init <slug> --desc "<中文描述>" --lane <lane> --owner <owner> --github --dry-run --json
 ```
 
 4. 如果计划涉及 `--github`、push、覆盖、secret、不可逆操作，先向用户确认。
 5. 执行：
 
 ```bash
-foyer project init <slug> --desc "<中文描述>" --lane <lane> --owner <owner> --json
+foyer project init <slug> --desc "<中文描述>" --lane <lane> --owner <owner> --github --json
 ```
 
 6. 用 CLI 返回的 JSON 生成中文摘要。
+
+## 关键说明
+
+- **必须传 `--github`**：否则不会创建远程仓库，`repositoryUrl` 为空，后续 `foyer repo prepare` 跨设备 clone 会失败。
+- `--github-owner` 可选，不传时 CLI 自动从 `gh api user` 推断。
 
 ## 禁止事项
 

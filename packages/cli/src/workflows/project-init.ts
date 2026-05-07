@@ -52,7 +52,7 @@ export function planProjectInit(
       warnings: request.createGithub
         ? []
         : ["未启用 GitHub 创建；执行时只创建本地仓库和 Foyer 记录。"],
-      humanSummaryZh: `将初始化项目 ${request.slug}，目标目录为 ${targetProjectPath}。dry-run 不会产生副作用。`,
+      humanSummaryZh: `将初始化项目 ${request.slug}，目标目录为 ${targetProjectPath} 。dry-run 不会产生副作用。`,
     };
 
     return ProjectInitPlanSchema.parse(plan);
@@ -117,7 +117,16 @@ export function executeProjectInit(
 
     let repositoryUrl: string | undefined;
     if (request.createGithub) {
-      const repoName = config.githubOwner ? `${config.githubOwner}/${request.slug}` : request.slug;
+      let owner = config.githubOwner;
+      if (!owner) {
+        const whoami = yield* shell.run("gh", ["api", "user", "--jq", ".login"], {
+          allowFailure: true,
+        });
+        if (whoami.exitCode === 0 && whoami.stdout.trim()) {
+          owner = whoami.stdout.trim();
+        }
+      }
+      const repoName = owner ? `${owner}/${request.slug}` : request.slug;
       const visibilityFlag = `--${request.githubVisibility}`;
       yield* shell.run(
         "gh",

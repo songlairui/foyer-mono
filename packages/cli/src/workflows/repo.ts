@@ -127,7 +127,7 @@ export function repoPrepare(
         slug: request.slug,
         projectPath: targetPath,
         action: "already-ready",
-        humanSummaryZh: `${request.slug} 已就绪于 ${targetPath}。`,
+        humanSummaryZh: `${request.slug} 已就绪于 ${targetPath} 。`,
       };
       return RepoPrepareResultSchema.parse(result);
     }
@@ -149,7 +149,7 @@ export function repoPrepare(
         projectPath: targetPath,
         repositoryUrl: project.repositoryUrl,
         action: "would-clone",
-        humanSummaryZh: `将 clone ${request.slug} 从 ${project.repositoryUrl} 到 ${targetPath}。`,
+        humanSummaryZh: `将 clone ${request.slug} 从 ${project.repositoryUrl} 到 ${targetPath} 。`,
       };
       return RepoPrepareResultSchema.parse(result);
     }
@@ -167,7 +167,7 @@ export function repoPrepare(
       projectPath: targetPath,
       repositoryUrl: project.repositoryUrl,
       action: "cloned",
-      humanSummaryZh: `已 clone ${request.slug} 到 ${targetPath}。`,
+      humanSummaryZh: `已 clone ${request.slug} 到 ${targetPath} 。`,
     };
     return RepoPrepareResultSchema.parse(result);
   });
