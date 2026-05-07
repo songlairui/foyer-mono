@@ -6,7 +6,8 @@ title: /prepare-vitepress — 为已有 markdown 文档集添加 vitepress
 type: feat
 tags: [skill, vitepress, md-reader]
 source: md-reader
-status: todo
+status: in-progress
+started: 2026-05-07T17:30:00+08:00
 ---
 
 ## 起意
@@ -39,7 +40,7 @@ md-reader 项目需要 vitepress 能力。此前在 effect-ts-tutor、k3s-tutor 
 
    ```bash
    # 按检测到的包管理器选择对应命令：
-   pnpm add -D vitepress        # pnpm
+   pnpm add -D vitepress        # pnpm 优先使用
    npm install -D vitepress     # npm
    yarn add -D vitepress        # yarn
    ```
@@ -158,26 +159,16 @@ md-reader 项目需要 vitepress 能力。此前在 effect-ts-tutor、k3s-tutor 
 - [ ] 在 md-reader 项目中触发 `/prepare-vitepress`，验证 skill 有效
 - [ ] 完成后通过 `inbox` skill 投递回 md-reader 项目（`_inbox/`）
 
-## 待用户确认
+## 已确认决定
 
-以下问题在设计阶段有取舍，需要确认后方可实现：
+**Q0：参数收集策略**（用户补充）
+优先从上下文自动推断（`project_name` 取 `package.json` 的 name/description，`github_url` 取 `repository.url`），只在无法推断时才询问。尽可能减少打断用户。
 
-**Q1：sidebar 生成策略**
-当前设计：agent 扫描文件自动生成 sidebar items（按文件名排序，取 H1 作为 text）。
-若文档目录有多级子目录（如 `docs/guide/`、`docs/api/`），自动扫描逻辑会更复杂。
-→ **选项 A**：skill 只处理单层目录，多级目录时告知用户手动编辑 config（简单稳定）
-→ **选项 B**：skill 递归扫描，自动生成多级 sidebar（复杂，但适合大型项目）
-→ **当前草稿默认选项 A**，请确认。
+**Q1：sidebar 生成策略** → 选项 B（多级嵌套）
+支持递归扫描多级子目录，自动生成嵌套 sidebar。但封面页（`index.md`）打开后，其子页面若还有嵌套子级，不需要全部遍历——合理深度（2-3 级）即可，超深层手动补充。
 
-**Q2：config 模板语言：`.mjs` 还是 `.ts`**
-lesson 用的是 `.mjs`（ESM JavaScript），但 vitepress 也支持 `.ts`（TypeScript，有类型提示）。
-→ 默认用 `.mjs` 还是检测项目是否有 TypeScript 配置后决定？
-→ **当前草稿默认 `.mjs`**，请确认。
+**Q2：config 语言** → 优先 `.ts`
+检测项目是否有 TypeScript（有 `tsconfig.json` 或 `.ts` 文件），有则用 `.ts`；无则也默认 `.ts`（能用 ts 就用 ts）。
 
-**Q3：首页 `text` / `tagline` / `features` 由 agent 生成还是留占位符**
-若让 agent 生成，质量取决于文档内容；若留占位符，用户需手动补全。
-→ **当前草稿：agent 生成**，但标注「可后续手动调整」。是否改为直接留占位符更诚实？
-
-**Q4：同步脚本路径确认**
-`sync-skills.sh` 将 skill 同步到 `~/.agents/skills/`（不是 `~/.claude/skills/`）。
-设计稿 TODO 已按此路径写入。请确认这是当前仓库约定的目标路径。
+**Q3：首页内容** → 由 code agent 生成
+`text` / `tagline` / `features` 由 agent 根据文档内容生成，标注「可后续手动调整」。
