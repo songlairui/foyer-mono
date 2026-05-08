@@ -28,6 +28,7 @@ import {
   repoStatus,
 } from "../workflows/repo";
 import { repoRootsAdd, repoRootsList, repoRootsRemove } from "../domain/scan-roots";
+import { openProject, setOpener, KNOWN_OPENERS } from "../workflows/open";
 import { Clock, FileSystem, NodeServicesLive, Shell } from "../services/context";
 import { errorToJson, exitCodeFor } from "../domain/errors";
 
@@ -421,6 +422,28 @@ program
       }),
       options,
     );
+  });
+
+program
+  .command("open")
+  .argument("<slug>", "kebab-case 项目名")
+  .option("--json", "输出稳定 JSON")
+  .description("用配置的编辑器打开项目目录")
+  .action(async (slug, options) => {
+    await run(openProject(slug), options);
+  });
+
+const candidates = Object.entries(KNOWN_OPENERS)
+  .map(([cmd, name]) => `  ${cmd.padEnd(12)} ${name}`)
+  .join("\n");
+
+program
+  .command("set-opener")
+  .argument("<opener>", `编辑器命令。候选:\n${candidates}`)
+  .option("--json", "输出稳定 JSON")
+  .description("设置 foyer open 使用的编辑器命令")
+  .action(async (opener, options) => {
+    await run(setOpener(opener), options);
   });
 
 program.parseAsync(process.argv).catch((error) => {

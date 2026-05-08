@@ -25,6 +25,8 @@ description: 零配置项目落户入口。识别创建项目/初始化 repo/登
    ```
 
 6. 用 CLI 返回的 JSON 生成中文摘要。
+7. 如果用户此前未配置 `foyer open`，提示运行 `foyer set-opener <opener>` 选择编辑器（候选: code, cursor, zed, windsurf, idea, subl）。
+8. 配置完成后（或已配置），通过 `foyer open <slug>` 在编辑器中打开项目。
 
 > `--init-from <value>` 可手动传入来覆盖自动探测结果。
 
@@ -32,6 +34,12 @@ description: 零配置项目落户入口。识别创建项目/初始化 repo/登
 
 - **必须传 `--github`**：否则不会创建远程仓库，`repositoryUrl` 为空，后续 `foyer repo prepare` 跨设备 clone 会失败。
 - `--github-owner` 可选，不传时 CLI 自动从 `gh api user` 推断。
+
+## foyer open / set-opener
+
+- `foyer set-opener <opener>`：设置默认编辑器（code → VS Code, zed → Zed, cursor → Cursor 等）。
+- `foyer open <slug>`：从 activity events 中查找项目本地路径，用配置的 opener 打开。
+- 若 opener 未设置或项目尚未 clone，自动给出中文提示。
 
 ## 禁止事项
 
