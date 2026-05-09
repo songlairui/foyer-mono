@@ -1,6 +1,12 @@
 packages:
   - "packages/*"
   - "apps/*"
+allowBuilds:
+  "@google/genai": true
+  "@mongodb-js/zstd": true
+  esbuild: true
+  node-liblzma: true
+  protobufjs: true
 catalog:
   vite: npm:@voidzero-dev/vite-plus-core@latest
   vitest: npm:@voidzero-dev/vite-plus-test@latest
