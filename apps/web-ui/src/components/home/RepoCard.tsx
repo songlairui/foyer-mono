@@ -54,8 +54,10 @@ export function RepoCard({
 }: RepoCardProps) {
   const [loading, setLoading] = useState(false);
   const [clicks, setClicks] = useState(() => getClickCount(repo.path));
-  const parts = repo.path.split("/");
-  const displayPath = parts.length > 4 ? "…/" + parts.slice(-3).join("/") : repo.path;
+  // 将 /Users/xxx/ 替换成 ~/
+  const pathWithTilde = repo.path.replace(/^\/Users\/[^/]+/, "~");
+  const parts = pathWithTilde.split("/");
+  const displayPath = parts.length > 4 ? "…/" + parts.slice(-3).join("/") : pathWithTilde;
 
   const handleOpen = async (e: React.MouseEvent) => {
     e.stopPropagation();
