@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import { spawn } from "node:child_process";
-import { writeFileSync, unlinkSync, readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { writeFileSync, unlinkSync, readFileSync, mkdirSync } from "node:fs";
+import { tmpdir, homedir } from "node:os";
 import { join } from "node:path";
 import { Effect } from "effect";
 import {
@@ -444,6 +444,101 @@ program
   .description("设置 foyer open 使用的编辑器命令")
   .action(async (opener, options) => {
     await run(setOpener(opener), options);
+  });
+
+const AGENT_PORT = 7070;
+
+function agentPidPath(): string {
+  return join(homedir(), ".foyer", "agent.pid");
+}
+
+function readAgentPid(): number | null {
+  try {
+    const pid = parseInt(readFileSync(agentPidPath(), "utf8").trim(), 10);
+    return isNaN(pid) ? null : pid;
+  } catch {
+    return null;
+  }
+}
+
+function isAgentRunning(pid: number | null): boolean {
+  if (!pid) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const agentCmd = program.command("agent").description("本地 web agent 服务管理");
+
+agentCmd
+  .command("start")
+  .option("--port <n>", "监听端口", String(AGENT_PORT))
+  .option("--json", "输出稳定 JSON")
+  .description("在后台启动本地 agent 服务（http://127.0.0.1:7070）")
+  .action(async (options: { port?: string; json?: boolean }) => {
+    const pid = readAgentPid();
+    if (isAgentRunning(pid)) {
+      const data = { running: true, pid, port: AGENT_PORT };
+      if (options.json) process.stdout.write(`${JSON.stringify({ ok: true, data })}\n`);
+      else process.stdout.write(`local agent 已在运行 (PID ${pid})，端口 ${AGENT_PORT}\n`);
+      return;
+    }
+    const agentScript = join(__dirname, "..", "..", "tui", "local-agent.ts");
+    const port = options.port ?? String(AGENT_PORT);
+    const child = spawn("bun", ["run", agentScript, "--port", port], {
+      detached: true,
+      stdio: "ignore",
+    });
+    child.unref();
+    mkdirSync(join(homedir(), ".foyer"), { recursive: true });
+    writeFileSync(agentPidPath(), String(child.pid));
+    const data = { pid: child.pid, port: parseInt(port, 10) };
+    if (options.json) process.stdout.write(`${JSON.stringify({ ok: true, data })}\n`);
+    else
+      process.stdout.write(
+        `local agent 已启动 (PID ${child.pid})，监听 http://127.0.0.1:${port}\n`,
+      );
+  });
+
+agentCmd
+  .command("stop")
+  .option("--json", "输出稳定 JSON")
+  .description("停止本地 agent 服务")
+  .action(async (options: { json?: boolean }) => {
+    const pid = readAgentPid();
+    if (!isAgentRunning(pid)) {
+      const data = { running: false };
+      if (options.json) process.stdout.write(`${JSON.stringify({ ok: true, data })}\n`);
+      else process.stdout.write("local agent 未运行\n");
+      return;
+    }
+    process.kill(pid!, "SIGTERM");
+    try {
+      unlinkSync(agentPidPath());
+    } catch {}
+    const data = { stopped: true, pid };
+    if (options.json) process.stdout.write(`${JSON.stringify({ ok: true, data })}\n`);
+    else process.stdout.write(`local agent 已停止 (PID ${pid})\n`);
+  });
+
+agentCmd
+  .command("status")
+  .option("--json", "输出稳定 JSON")
+  .description("查看本地 agent 服务状态")
+  .action(async (options: { json?: boolean }) => {
+    const pid = readAgentPid();
+    const running = isAgentRunning(pid);
+    const data = { running, pid: running ? pid : null, port: running ? AGENT_PORT : null };
+    if (options.json) process.stdout.write(`${JSON.stringify({ ok: true, data })}\n`);
+    else
+      process.stdout.write(
+        running
+          ? `local agent 运行中 (PID ${pid})，端口 ${AGENT_PORT}\n`
+          : "local agent 未运行。运行 foyer agent start 启动。\n",
+      );
   });
 
 program.parseAsync(process.argv).catch((error) => {
