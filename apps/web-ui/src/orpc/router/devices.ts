@@ -1,8 +1,9 @@
 import { os } from "@orpc/server";
 import { execFile } from "node:child_process";
-import { promisify } from "node:util";
+import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
@@ -12,6 +13,10 @@ export interface Repo {
   repo: string;
   path: string;
   scanRoot: string;
+  description?: string;
+  lane?: string;
+  slug?: string;
+  lastModified?: number;
 }
 
 export interface ScanRoot {
@@ -33,28 +38,85 @@ interface FoyerOutput {
   };
 }
 
+interface FoyerProject {
+  slug: string;
+  description: string;
+  lane: string;
+  projectPath: string;
+}
+
+interface FoyerListOutput {
+  ok: boolean;
+  data: {
+    projects: FoyerProject[];
+  };
+}
+
+async function getLastModified(repoPath: string): Promise<number> {
+  try {
+    const commitMsgStat = await stat(join(repoPath, ".git", "COMMIT_EDITMSG"));
+    return commitMsgStat.mtimeMs;
+  } catch {
+    try {
+      const repoStat = await stat(repoPath);
+      return repoStat.mtimeMs;
+    } catch {
+      return 0;
+    }
+  }
+}
+
 export const listDevices = os.handler(async () => {
   try {
-    const { stdout } = await execFileAsync(
-      FOYER_PATH,
-      ["repo", "devices", "--all-roots", "--json"],
-      {
-        env: { ...process.env, HOME: homedir() },
-      },
-    );
+    const execEnv = { env: { ...process.env, HOME: homedir() } };
 
-    const result = JSON.parse(stdout) as FoyerOutput;
-    if (!result.ok) return [] as ScanRoot[];
+    const [devicesResult, listResult] = await Promise.all([
+      execFileAsync(FOYER_PATH, ["repo", "devices", "--all-roots", "--json"], execEnv),
+      execFileAsync(FOYER_PATH, ["repo", "list", "--json"], execEnv).catch(() => ({
+        stdout: '{"ok":false,"data":{"projects":[]}}',
+      })),
+    ]);
 
-    // group by scanRoot
-    const map = new Map<string, Repo[]>();
-    for (const d of result.data.devices) {
-      const list = map.get(d.scanRoot) ?? [];
-      list.push({ repo: d.repo, path: d.path, scanRoot: d.scanRoot });
-      map.set(d.scanRoot, list);
+    const devicesOutput = JSON.parse(devicesResult.stdout) as FoyerOutput;
+    if (!devicesOutput.ok) return [] as ScanRoot[];
+
+    const listOutput = JSON.parse(listResult.stdout) as FoyerListOutput;
+    const projectMap = new Map<string, FoyerProject>();
+    if (listOutput.ok) {
+      for (const p of listOutput.data.projects) {
+        projectMap.set(p.projectPath, p);
+      }
     }
 
-    return Array.from(map.entries()).map(([path, repos]) => ({ path, repos }));
+    const devices = devicesOutput.data.devices;
+
+    const repos: Repo[] = await Promise.all(
+      devices.map(async (d) => {
+        const project = projectMap.get(d.path);
+        const lastModified = await getLastModified(d.path);
+        return {
+          repo: d.repo,
+          path: d.path,
+          scanRoot: d.scanRoot,
+          description: project?.description,
+          lane: project?.lane,
+          slug: project?.slug,
+          lastModified,
+        };
+      }),
+    );
+
+    const map = new Map<string, Repo[]>();
+    for (const repo of repos) {
+      const list = map.get(repo.scanRoot) ?? [];
+      list.push(repo);
+      map.set(repo.scanRoot, list);
+    }
+
+    return Array.from(map.entries()).map(([path, repoList]) => ({
+      path,
+      repos: repoList,
+    }));
   } catch (e) {
     process.stderr.write(`[devices] ${String(e)}\n`);
     return [] as ScanRoot[];
