@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Foyer · Devices</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d0d0f;
+    --surface: #17171a;
+    --surface-hover: #1e1e22;
+    --border: #2a2a2f;
+    --border-hover: #3d3d45;
+    --text: #e8e8ed;
+    --text-muted: #6b6b78;
+    --text-dim: #4a4a54;
+    --accent: #7c6af7;
+    --accent-dim: #3d3660;
+    --green: #3ecf8e;
+    --green-dim: #1a4a37;
+    --sidebar-w: 260px;
+    --header-h: 56px;
+  }
+
+  html { height: 100%; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  /* ── Header ── */
+  .header {
+    height: var(--header-h);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    gap: 20px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: -0.01em;
+    color: var(--text);
+    flex-shrink: 0;
+  }
+
+  .logo-dot {
+    width: 8px;
+    height: 8px;
+    background: var(--accent);
+    border-radius: 50%;
+  }
+
+  .header-divider {
+    width: 1px;
+    height: 20px;
+    background: var(--border);
+  }
+
+  .stats-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+  }
+
+  .stat-item {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+  }
+
+  .stat-num {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stat-label {
+    color: var(--text-muted);
+    font-size: 12px;
+  }
+
+  .search-wrap {
+    flex: 1;
+    max-width: 360px;
+    position: relative;
+  }
+
+  .search-icon {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-dim);
+    pointer-events: none;
+  }
+
+  .search-input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 13px;
+    padding: 6px 10px 6px 32px;
+    outline: none;
+    transition: border-color 0.15s;
+    font-family: inherit;
+  }
+
+  .search-input::placeholder { color: var(--text-dim); }
+  .search-input:focus { border-color: var(--accent); }
+
+  .header-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .device-badge {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border: 1px solid #4a42a0;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+  }
+
+  /* ── Layout ── */
+  .layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: var(--sidebar-w);
+    flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 16px 0;
+  }
+
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-track { background: transparent; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .sidebar-section-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    padding: 0 16px 8px;
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 16px;
+    cursor: pointer;
+    border-radius: 0;
+    transition: background 0.1s;
+    border-left: 2px solid transparent;
+    gap: 8px;
+  }
+
+  .nav-item:hover { background: var(--surface-hover); }
+
+  .nav-item.active {
+    background: var(--accent-dim);
+    border-left-color: var(--accent);
+  }
+
+  .nav-item.active .nav-label { color: var(--text); }
+
+  .nav-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .nav-root-path {
+    font-size: 11px;
+    color: var(--text-dim);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+  }
+
+  .nav-count {
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-dim);
+    background: var(--bg);
+    padding: 1px 6px;
+    border-radius: 10px;
+    flex-shrink: 0;
+  }
+
+  .nav-item.active .nav-count {
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+
+  .sidebar-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 8px 0;
+  }
+
+  /* ── Main ── */
+  .main {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px 32px;
+  }
+
+  .main::-webkit-scrollbar { width: 6px; }
+  .main::-webkit-scrollbar-track { background: transparent; }
+  .main::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* ── Root Section ── */
+  .root-section {
+    margin-bottom: 40px;
+  }
+
+  .root-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .root-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+    letter-spacing: -0.01em;
+  }
+
+  .root-count-badge {
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-dim);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 1px 7px;
+    border-radius: 10px;
+  }
+
+  .root-line {
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ── Grid ── */
+  .repo-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 10px;
+  }
+
+  /* ── Card ── */
+  .repo-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    cursor: default;
+    transition: border-color 0.15s, background 0.15s, transform 0.1s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .repo-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--border), transparent);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .repo-card:hover {
+    border-color: var(--border-hover);
+    background: var(--surface-hover);
+    transform: translateY(-1px);
+  }
+
+  .repo-card:hover::before { opacity: 1; }
+
+  .repo-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+    letter-spacing: -0.01em;
+    margin-bottom: 5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .repo-path {
+    font-size: 11px;
+    color: var(--text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  }
+
+  .repo-path .path-root {
+    color: var(--text-muted);
+  }
+
+  /* nested indicator */
+  .nested-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 6px;
+  }
+
+  .nested-badge::before {
+    content: '↳';
+    font-size: 10px;
+  }
+
+  /* hidden card (search) */
+  .repo-card.hidden { display: none; }
+
+  /* empty state */
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-muted);
+  }
+
+  .empty-state-icon { font-size: 32px; margin-bottom: 12px; opacity: 0.4; }
+  .empty-state-text { font-size: 14px; }
+
+  /* ── Match highlight ── */
+  .hl { color: var(--accent); background: var(--accent-dim); border-radius: 2px; padding: 0 1px; }
+
+  /* ── No results ── */
+  .no-results {
+    display: none;
+    text-align: center;
+    padding: 48px 20px;
+    color: var(--text-dim);
+  }
+
+  .no-results.show { display: block; }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="logo">
+    <div class="logo-dot"></div>
+    Foyer
+  </div>
+  <div class="header-divider"></div>
+  <div class="stats-row">
+    <div class="stat-item">
+      <span class="stat-num" id="stat-roots">4</span>
+      <span class="stat-label">roots</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-num" id="stat-repos">131</span>
+      <span class="stat-label">repos</span>
+    </div>
+    <div class="stat-item" id="stat-filtered-wrap" style="display:none">
+      <span class="stat-num" id="stat-filtered">0</span>
+      <span class="stat-label">matched</span>
+    </div>
+  </div>
+  <div class="search-wrap">
+    <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+    </svg>
+    <input class="search-input" id="search" type="text" placeholder="搜索 repo 名称或路径…" autocomplete="off" spellcheck="false">
+  </div>
+  <div class="header-right">
+    <span class="device-badge" id="device-label">lary-mbp.local</span>
+  </div>
+</header>
+
+<div class="layout">
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-section-label">Scan Roots</div>
+    <div id="nav-list"></div>
+  </nav>
+
+  <main class="main" id="main">
+    <div id="content"></div>
+    <div class="no-results" id="no-results">
+      <div style="font-size:28px;margin-bottom:10px;opacity:0.3">◌</div>
+      <div>没有匹配的 repo</div>
+    </div>
+  </main>
+</div>
+
+<script>
+const DATA = {"ok":true,"data":{"devices":[{"device":"lary-mbp.local","repo":"agent-monad","path":"/Users/larysong/github/agent-monad","scanRoot":"/Users/larysong/github"},{"device":"lary-mbp.local","repo":"agent-skills","path":"/Users/larysong/github/agent-skills","scanRoot":"/Users/larysong/github"},{"device":"lary-mbp.local","repo":"batch-claws","path":"/Users/larysong/github/batch-claws","scanRoot":"/Users/larysong/github"},{"device":"lary-mbp.local","repo":"alice","path":"/Users/larysong/github/batch-claws/workspaces/alice","scanRoot":"/Users/larysong/github"},{"device":"lary-mbp.local","repo":"bob","path":"/Users/larysong/github/batch-claws/workspaces/bob","scanRoot":"/Users/larysong/github"},{"device":"lary-mbp.local","repo":"deer-flow","path":"/Users/larysong/github/deer-flow","scanRoot":"/Users/larysong/github"},{"device":"lary-mbp.local","repo":"dir-manage-spec","path":"/Users/larysong/github/dir-manage-spec","scanRoot":"/Users/larysong/github"},{"device":"lary-mbp.local","repo":"dot-node-grows","path":"/Users/larysong/github/dot-node-grows","scanRoot":"/Users/larysong/github"},{"device":"lary-mbp.local","repo":"everything-claude-code","path":"/Users/larysong/github/everything-claude-code","scanRoot":"/Users/larysong/github"},{"device":"lary-mbp.local","repo":"lary-wanman","path":"/Users/larysong/github/lary-wanman","scanRoot":"/Users/larysong/github"},{"device":"lary-mbp.local","repo":"OmniParser","path":"/Users/larysong/github/OmniParser","scanRoot":"/Users/larysong/github"},{"device":"lary-mbp.local","repo":"open-design","path":"/Users/larysong/github/open-design","scanRoot":"/Users/larysong/github"},{"device":"lary-mbp.local","repo":"openclaw","path":"/Users/larysong/github/openclaw","scanRoot":"/Users/larysong/github"},{"device":"lary-mbp.local","repo":"rig","path":"/Users/larysong/github/rig","scanRoot":"/Users/larysong/github"},{"device":"lary-mbp.local","repo":"screenshot-to-code","path":"/Users/larysong/github/screenshot-to-code","scanRoot":"/Users/larysong/github"},{"device":"lary-mbp.local","repo":"colorful-nav","path":"/Users/larysong/playground/colorful-nav","scanRoot":"/Users/larysong/playground"},{"device":"lary-mbp.local","repo":"custom-extenstion-within-type","path":"/Users/larysong/playground/custom-extenstion-within-type","scanRoot":"/Users/larysong/playground"},{"device":"lary-mbp.local","repo":"demo-spark","path":"/Users/larysong/playground/demo-spark","scanRoot":"/Users/larysong/playground"},{"device":"lary-mbp.local","repo":"flutter-hello","path":"/Users/larysong/playground/flutter-hello","scanRoot":"/Users/larysong/playground"},{"device":"lary-mbp.local","repo":"google-maps-demo","path":"/Users/larysong/playground/google-maps-demo","scanRoot":"/Users/larysong/playground"},{"device":"lary-mbp.local","repo":"integrating-lynx-demo-projects","path":"/Users/larysong/playground/integrating-lynx-demo-projects","scanRoot":"/Users/larysong/playground"},{"device":"lary-mbp.local","repo":"lary-openclaw-plugins","path":"/Users/larysong/playground/lary-openclaw-plugins","scanRoot":"/Users/larysong/playground"},{"device":"lary-mbp.local","repo":"mf-vite-alias","path":"/Users/larysong/playground/mf-vite-alias","scanRoot":"/Users/larysong/playground"},{"device":"lary-mbp.local","repo":"mmm","path":"/Users/larysong/playground/play-nx/mmm","scanRoot":"/Users/larysong/playground"},{"device":"lary-mbp.local","repo":"say-hi-lynx","path":"/Users/larysong/playground/say-hi-lynx","scanRoot":"/Users/larysong/playground"},{"device":"lary-mbp.local","repo":"sentry-tsr","path":"/Users/larysong/playground/sentry-tsr","scanRoot":"/Users/larysong/playground"},{"device":"lary-mbp.local","repo":"ts-plugin-resolve-extension","path":"/Users/larysong/playground/ts-plugin-resolve-extension","scanRoot":"/Users/larysong/playground"},{"device":"lary-mbp.local","repo":"vite-project","path":"/Users/larysong/playground/vite-project","scanRoot":"/Users/larysong/playground"},{"device":"lary-mbp.local","repo":"say-hi","path":"/Users/larysong/playground/x-say-hi/say-hi","scanRoot":"/Users/larysong/playground"},{"device":"lary-mbp.local","repo":"xx-vp-monorepo","path":"/Users/larysong/playground/xx-vp-monorepo","scanRoot":"/Users/larysong/playground"},{"device":"lary-mbp.local","repo":"repo","path":"/Users/larysong/repo","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"a6-guidebook","path":"/Users/larysong/repo/a6-guidebook","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"aaa","path":"/Users/larysong/repo/aaa","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"ary-workbench","path":"/Users/larysong/repo/ary-workbench","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"awesome-openclaw-usecases","path":"/Users/larysong/repo/awesome-openclaw-usecases","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"boot-mtt","path":"/Users/larysong/repo/boot-mtt","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"bot-api","path":"/Users/larysong/repo/bot-api","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"breathe-mini","path":"/Users/larysong/repo/breathe-mini","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"bundle_workspace","path":"/Users/larysong/repo/bundle_workspace","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"cache-probe","path":"/Users/larysong/repo/cache-probe","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"chat-archaeologist","path":"/Users/larysong/repo/chat-archaeologist","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"cli-combo-game","path":"/Users/larysong/repo/cli-combo-game","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"Cli-Proxy-API-Management-Center","path":"/Users/larysong/repo/Cli-Proxy-API-Management-Center","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"click-click","path":"/Users/larysong/repo/click-click","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"code-like-me","path":"/Users/larysong/repo/code-like-me","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"coding-plan-usage","path":"/Users/larysong/repo/coding-plan-usage","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"console-skills","path":"/Users/larysong/repo/console-skills","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"coolify-bot-feishu","path":"/Users/larysong/repo/coolify-bot-feishu","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"draft","path":"/Users/larysong/repo/draft","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"editor-labs","path":"/Users/larysong/repo/editor-labs","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"esm-dev-react","path":"/Users/larysong/repo/esm-dev-react","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"exo-legs","path":"/Users/larysong/repo/exo-legs","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"f-nav","path":"/Users/larysong/repo/f-nav","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"feishu-chat-manage","path":"/Users/larysong/repo/feishu-chat-manage","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"figless","path":"/Users/larysong/repo/figless","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"flat-oidc-api","path":"/Users/larysong/repo/flat-oidc-api","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"git-insight","path":"/Users/larysong/repo/git-insight","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"git-insight-mono","path":"/Users/larysong/repo/git-insight-mono","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"harness-view","path":"/Users/larysong/repo/harness-view","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"hermes-agent","path":"/Users/larysong/repo/hermes-agent","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"i18n-finder","path":"/Users/larysong/repo/i18n-finder","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"idea-reactivator","path":"/Users/larysong/repo/idea-reactivator","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"idl-mono","path":"/Users/larysong/repo/idl-mono","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"labs-editor","path":"/Users/larysong/repo/labs-editor","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"lary-skills","path":"/Users/larysong/repo/lary-skills","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"learn-go","path":"/Users/larysong/repo/learn-go","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"lite-kasm-workspace","path":"/Users/larysong/repo/lite-kasm-workspace","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"lulu-site","path":"/Users/larysong/repo/lulu-site","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"make-skills-clean","path":"/Users/larysong/repo/make-skills-clean","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"mtt-asset-flow","path":"/Users/larysong/repo/mtt-asset-flow","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"mtt-cdn-management","path":"/Users/larysong/repo/mtt-cdn-management","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"mtt-sports-openclaw-plugin","path":"/Users/larysong/repo/mtt-sports-openclaw-plugin","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"mttsports-cli","path":"/Users/larysong/repo/mttsports-cli","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"my-app","path":"/Users/larysong/repo/my-app","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"natal-skills","path":"/Users/larysong/repo/natal-skills","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"newmoon-www","path":"/Users/larysong/repo/newmoon-www","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"openclaw-lark","path":"/Users/larysong/repo/openclaw-lark","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"openclaw-play-game","path":"/Users/larysong/repo/openclaw-play-game","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"play-mimo-tts","path":"/Users/larysong/repo/play-mimo-tts","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"players","path":"/Users/larysong/repo/players","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"po-to-product","path":"/Users/larysong/repo/po-to-product","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"claude-task-master","path":"/Users/larysong/repo/po-to-product/claude-task-master","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"deepcode","path":"/Users/larysong/repo/po-to-product/deepcode","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"ppcl","path":"/Users/larysong/repo/ppcl","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"ppp","path":"/Users/larysong/repo/ppp","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"prd-prototype-prompt","path":"/Users/larysong/repo/prd-prototype-prompt","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"pre-deal-assets","path":"/Users/larysong/repo/pre-deal-assets","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"prompt-cases","path":"/Users/larysong/repo/prompt-cases","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"protobuf-es","path":"/Users/larysong/repo/protobuf-es","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"raw-asset-manage","path":"/Users/larysong/repo/raw-asset-manage","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"raw-feishu-openclaw","path":"/Users/larysong/repo/raw-feishu-openclaw","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"reading","path":"/Users/larysong/repo/reading","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"ruihang-talent-consulting","path":"/Users/larysong/repo/ruihang-talent-consulting","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"say-hi","path":"/Users/larysong/repo/say-hi","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"scroll-read","path":"/Users/larysong/repo/scroll-read","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"setup-openclaw-boyaa","path":"/Users/larysong/repo/setup-openclaw-boyaa","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"simple-mem-dockerfile","path":"/Users/larysong/repo/simple-mem-dockerfile","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"skill-to-tweak-panel","path":"/Users/larysong/repo/skill-to-tweak-panel","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"standalone-eva","path":"/Users/larysong/repo/standalone-eva","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"streamkit","path":"/Users/larysong/repo/streamkit","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"test_noti","path":"/Users/larysong/repo/test_noti","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"torpc","path":"/Users/larysong/repo/torpc","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"tts-tune-ground","path":"/Users/larysong/repo/tts-tune-ground","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"vite-plugin-asset-flow","path":"/Users/larysong/repo/vite-plugin-asset-flow","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"workspace-manage","path":"/Users/larysong/repo/workspace-manage","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"mttsports-cli","path":"/Users/larysong/repo/workspace-manage/repos/mttsports-cli","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"openclaw-play-game","path":"/Users/larysong/repo/workspace-manage/repos/openclaw-play-game","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"xzy-career-assessment","path":"/Users/larysong/repo/xzy-career-assessment","scanRoot":"/Users/larysong/repo"},{"device":"lary-mbp.local","repo":"ai-chat-expression-miner","path":"/Users/larysong/repo/projects/ai-chat-expression-miner","scanRoot":"/Users/larysong/repo/projects"},{"device":"lary-mbp.local","repo":"create-dream","path":"/Users/larysong/repo/projects/create-dream","scanRoot":"/Users/larysong/repo/projects"},{"device":"lary-mbp.local","repo":"deliberation-skill","path":"/Users/larysong/repo/projects/deliberation-skill","scanRoot":"/Users/larysong/repo/projects"},{"device":"lary-mbp.local","repo":"display-brightness-sync","path":"/Users/larysong/repo/projects/display-brightness-sync","scanRoot":"/Users/larysong/repo/projects"},{"device":"lary-mbp.local","repo":"dns-portal","path":"/Users/larysong/repo/projects/dns-portal","scanRoot":"/Users/larysong/repo/projects"},{"device":"lary-mbp.local","repo":"dp-agent-loop","path":"/Users/larysong/repo/projects/dp-agent-loop","scanRoot":"/Users/larysong/repo/projects"},{"device":"lary-mbp.local","repo":"effect-ts-tutor","path":"/Users/larysong/repo/projects/effect-ts-tutor","scanRoot":"/Users/larysong/repo/projects"},{"device":"lary-mbp.local","repo":"foyer-mono","path":"/Users/larysong/repo/projects/foyer-mono","scanRoot":"/Users/larysong/repo/projects"},{"device":"lary-mbp.local","repo":"k3s-tutor","path":"/Users/larysong/repo/projects/k3s-tutor","scanRoot":"/Users/larysong/repo/projects"},{"device":"lary-mbp.local","repo":"llm-fusion","path":"/Users/larysong/repo/projects/llm-fusion","scanRoot":"/Users/larysong/repo/projects"},{"device":"lary-mbp.local","repo":"llm-world-knowledge","path":"/Users/larysong/repo/projects/llm-world-knowledge","scanRoot":"/Users/larysong/repo/projects"},{"device":"lary-mbp.local","repo":"md-reader","path":"/Users/larysong/repo/projects/md-reader","scanRoot":"/Users/larysong/repo/projects"},{"device":"lary-mbp.local","repo":"meta-breaker","path":"/Users/larysong/repo/projects/meta-breaker","scanRoot":"/Users/larysong/repo/projects"},{"device":"lary-mbp.local","repo":"motion-essence","path":"/Users/larysong/repo/projects/motion-essence","scanRoot":"/Users/larysong/repo/projects"},{"device":"lary-mbp.local","repo":"paradigm-dashboard","path":"/Users/larysong/repo/projects/paradigm-dashboard","scanRoot":"/Users/larysong/repo/projects"},{"device":"lary-mbp.local","repo":"react-live-playground","path":"/Users/larysong/repo/projects/react-live-playground","scanRoot":"/Users/larysong/repo/projects"},{"device":"lary-mbp.local","repo":"req-self-test","path":"/Users/larysong/repo/projects/req-self-test","scanRoot":"/Users/larysong/repo/projects"},{"device":"lary-mbp.local","repo":"s3-publisher","path":"/Users/larysong/repo/projects/s3-publisher","scanRoot":"/Users/larysong/repo/projects"},{"device":"lary-mbp.local","repo":"screenshot-to-code","path":"/Users/larysong/repo/projects/screenshot-to-code","scanRoot":"/Users/larysong/repo/projects"},{"device":"lary-mbp.local","repo":"skill-forge","path":"/Users/larysong/repo/projects/skill-forge","scanRoot":"/Users/larysong/repo/projects"},{"device":"lary-mbp.local","repo":"skill-reader","path":"/Users/larysong/repo/projects/skill-reader","scanRoot":"/Users/larysong/repo/projects"},{"device":"lary-mbp.local","repo":"star-curator","path":"/Users/larysong/repo/projects/star-curator","scanRoot":"/Users/larysong/repo/projects"},{"device":"lary-mbp.local","repo":"vercel-json-render-playground","path":"/Users/larysong/repo/projects/vercel-json-render-playground","scanRoot":"/Users/larysong/repo/projects"}],"humanSummaryZh":"4 个扫描根，共 131 个仓库。"}};
+
+(function () {
+  const devices = DATA.data.devices;
+
+  // Group by scanRoot
+  const rootMap = new Map();
+  for (const d of devices) {
+    if (!rootMap.has(d.scanRoot)) rootMap.set(d.scanRoot, []);
+    rootMap.get(d.scanRoot).push(d);
+  }
+
+  const roots = [...rootMap.keys()];
+  const device = devices[0]?.device || 'unknown';
+
+  // Update header
+  document.getElementById('stat-roots').textContent = roots.length;
+  document.getElementById('stat-repos').textContent = devices.length;
+  document.getElementById('device-label').textContent = device;
+
+  // Detect nested repos (path !== scanRoot + '/' + repo)
+  function isNested(d) {
+    const expected = d.scanRoot + '/' + d.repo;
+    return d.path !== expected;
+  }
+
+  function getRelPath(d) {
+    return d.path.replace(d.scanRoot + '/', '');
+  }
+
+  // Build sidebar nav
+  const navList = document.getElementById('nav-list');
+  roots.forEach((root, i) => {
+    const count = rootMap.get(root).length;
+    const shortRoot = root.replace('/Users/larysong/', '~/');
+    const item = document.createElement('div');
+    item.className = 'nav-item' + (i === 0 ? ' active' : '');
+    item.dataset.root = root;
+    item.innerHTML = `
+      <span class="nav-root-path">${escHtml(shortRoot)}</span>
+      <span class="nav-count">${count}</span>
+    `;
+    item.addEventListener('click', () => {
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+      item.classList.add('active');
+      const sec = document.getElementById('section-' + CSS.escape(root));
+      if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    navList.appendChild(item);
+  });
+
+  // Build main content
+  const content = document.getElementById('content');
+  roots.forEach(root => {
+    const repos = rootMap.get(root);
+    const shortRoot = root.replace('/Users/larysong/', '~/');
+    const section = document.createElement('div');
+    section.className = 'root-section';
+    section.id = 'section-' + root;
+
+    const header = document.createElement('div');
+    header.className = 'root-header';
+    header.innerHTML = `
+      <span class="root-title">${escHtml(shortRoot)}</span>
+      <span class="root-count-badge">${repos.length}</span>
+      <div class="root-line"></div>
+    `;
+    section.appendChild(header);
+
+    const grid = document.createElement('div');
+    grid.className = 'repo-grid';
+
+    repos.forEach(d => {
+      const nested = isNested(d);
+      const relPath = getRelPath(d);
+      const card = document.createElement('div');
+      card.className = 'repo-card';
+      card.dataset.repo = d.repo.toLowerCase();
+      card.dataset.path = d.path.toLowerCase();
+
+      let pathHtml = '';
+      if (nested) {
+        const parts = relPath.split('/');
+        const dirs = parts.slice(0, -1).join('/');
+        pathHtml = `<div class="repo-path"><span class="path-root">${escHtml(dirs)}/</span>${escHtml(parts[parts.length - 1])}</div>`;
+      } else {
+        pathHtml = `<div class="repo-path">${escHtml(relPath)}</div>`;
+      }
+
+      card.innerHTML = `
+        <div class="repo-name">${escHtml(d.repo)}</div>
+        ${pathHtml}
+      `;
+      grid.appendChild(card);
+    });
+
+    section.appendChild(grid);
+    content.appendChild(section);
+  });
+
+  // Search
+  const searchInput = document.getElementById('search');
+  const statFilteredWrap = document.getElementById('stat-filtered-wrap');
+  const statFiltered = document.getElementById('stat-filtered');
+  const noResults = document.getElementById('no-results');
+
+  searchInput.addEventListener('input', () => {
+    const q = searchInput.value.trim().toLowerCase();
+    if (!q) {
+      document.querySelectorAll('.repo-card').forEach(c => c.classList.remove('hidden'));
+      document.querySelectorAll('.root-section').forEach(s => s.style.display = '');
+      statFilteredWrap.style.display = 'none';
+      noResults.classList.remove('show');
+      return;
+    }
+
+    let total = 0;
+    document.querySelectorAll('.root-section').forEach(section => {
+      let sectionVisible = 0;
+      section.querySelectorAll('.repo-card').forEach(card => {
+        const name = card.dataset.repo || '';
+        const path = card.dataset.path || '';
+        const match = name.includes(q) || path.includes(q);
+        card.classList.toggle('hidden', !match);
+        if (match) sectionVisible++;
+      });
+      section.style.display = sectionVisible === 0 ? 'none' : '';
+      total += sectionVisible;
+    });
+
+    statFiltered.textContent = total;
+    statFilteredWrap.style.display = '';
+    noResults.classList.toggle('show', total === 0);
+  });
+
+  // Keyboard shortcut: / to focus search
+  document.addEventListener('keydown', e => {
+    if (e.key === '/' && document.activeElement !== searchInput) {
+      e.preventDefault();
+      searchInput.focus();
+    }
+    if (e.key === 'Escape') {
+      searchInput.value = '';
+      searchInput.dispatchEvent(new Event('input'));
+      searchInput.blur();
+    }
+  });
+
+  // IntersectionObserver: highlight active nav on scroll
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting && entry.intersectionRatio > 0.1) {
+        const root = entry.target.id.replace('section-', '');
+        document.querySelectorAll('.nav-item').forEach(el => {
+          el.classList.toggle('active', el.dataset.root === root);
+        });
+      }
+    });
+  }, { threshold: 0.1, rootMargin: '-56px 0px -60% 0px' });
+
+  document.querySelectorAll('.root-section').forEach(s => observer.observe(s));
+
+  function escHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+})();
+</script>
+</body>
+</html>
