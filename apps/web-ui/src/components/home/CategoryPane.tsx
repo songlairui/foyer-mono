@@ -1,8 +1,7 @@
 import { ScrollArea } from "#/components/ui/scroll-area";
 import { Badge } from "#/components/ui/badge";
-import { useDroppable } from "@dnd-kit/core";
 import type { Repo, RepoTag, Category } from "./types";
-import { DraggableRepoCard } from "./DraggableRepoCard";
+import { RepoCard } from "./RepoCard";
 import { CAT_META } from "./utils";
 
 interface CategoryPaneProps {
@@ -32,18 +31,11 @@ export function CategoryPane({
 }: CategoryPaneProps) {
   const meta = CAT_META[category];
   const label = workDir ?? meta.label;
-  const paneId = id || "";
-  const { setNodeRef, isOver: isCurrentlyOver } = useDroppable({
-    id: paneId,
-    data: { type: "categoryPane", category, workDir, paneId },
-  });
 
   return (
     <div
-      ref={setNodeRef}
-      className={`flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border p-4 transition-all ${
-        isCurrentlyOver ? "border-ring/50 bg-ring/5" : "border-border/30 bg-card/30"
-      }`}
+      id={id}
+      className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-border/30 bg-card/30 p-4 transition-all"
     >
       <div className="flex items-center gap-2 mb-3 shrink-0">
         <div className={`p-1.5 rounded-md ${meta.bg}`}>{meta.icon}</div>
@@ -63,9 +55,8 @@ export function CategoryPane({
         ) : (
           <div className="grid gap-2 pr-2 grid-cols-[repeat(auto-fill,minmax(220px,1fr))]">
             {repos.map((repo) => (
-              <DraggableRepoCard
+              <RepoCard
                 key={repo.path}
-                source="category"
                 repo={repo}
                 tag={tags[repo.path]}
                 workDirs={workDirs}

@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { orpc } from "#/orpc/client";
 import { Badge } from "#/components/ui/badge";
@@ -6,72 +6,17 @@ import { Input } from "#/components/ui/input";
 import { Button } from "#/components/ui/button";
 import { ScrollArea } from "#/components/ui/scroll-area";
 import { toast } from "sonner";
-import { useEffect, useRef, useState, useMemo, useCallback, type ReactNode } from "react";
-import { FolderSearch, Circle, RefreshCw, Search } from "lucide-react";
-import {
-  DndContext,
-  pointerWithin,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragOverlay,
-  type DragStartEvent,
-  type DragEndEvent,
-  type DragCancelEvent,
-  useDroppable,
-} from "@dnd-kit/core";
+import { useEffect, useRef, useState, useMemo, useCallback } from "react";
+import { FolderSearch, Circle, RefreshCw, Search, Tags } from "lucide-react";
 
 // Import our components
 import { FullscreenButton } from "#/components/home/FullscreenButton";
-import { RepoCard } from "#/components/home/RepoCard";
 import { CategoryPane } from "#/components/home/CategoryPane";
-import { DraggableRepoCard, type RepoDragSource } from "#/components/home/DraggableRepoCard";
+import { RepoCard } from "#/components/home/RepoCard";
 import type { Repo, RepoTag, Category } from "#/components/home/types";
 import { readAllTags, writeTag, readWorkDirs, writeWorkDirs } from "#/components/home/storage";
 
 export const Route = createFileRoute("/")({ component: HomePage });
-
-const REPO_LIST_DROP_ID = "repo-list-drop";
-
-type ActiveDrag = {
-  path: string;
-  source: RepoDragSource;
-};
-
-type DropData =
-  | { type: "categoryPane"; category: Category; workDir?: string; paneId: string }
-  | { type: "repoList" };
-
-function sameTag(a: RepoTag | undefined, b: RepoTag | null) {
-  if (!a || !b) return !a && !b;
-  return a.category === b.category && a.workDir === b.workDir;
-}
-
-function RepoListDropArea({
-  categoryDragActive,
-  children,
-}: {
-  categoryDragActive: boolean;
-  children: ReactNode;
-}) {
-  const { setNodeRef, isOver } = useDroppable({
-    id: REPO_LIST_DROP_ID,
-    data: { type: "repoList" } satisfies DropData,
-  });
-
-  return (
-    <div
-      ref={setNodeRef}
-      className={`flex-2 min-w-0 border rounded-xl w-[40%] flex flex-col overflow-hidden transition-colors ${
-        categoryDragActive && isOver
-          ? "border-ring/60 bg-ring/10"
-          : "border-border/30 bg-card/20"
-      }`}
-    >
-      {children}
-    </div>
-  );
-}
 
 function HomePage() {
   const queryClient = useQueryClient();
@@ -83,8 +28,6 @@ function HomePage() {
 
   const [tags, setTagsState] = useState<Record<string, RepoTag>>(readAllTags);
   const [workDirs, setWorkDirsState] = useState<string[]>(readWorkDirs);
-
-  const [activeDrag, setActiveDrag] = useState<ActiveDrag | null>(null);
 
   const devicesQueryOptions = orpc.devices.list.queryOptions();
   const {
@@ -102,14 +45,13 @@ function HomePage() {
   const openMutation = useMutation(orpc.agent.open.mutationOptions());
 
   const allRepos = useMemo(() => devicesData.flatMap((r) => r.repos), [devicesData]);
-  const visibleDeviceGroups = useMemo(() => {
+  const filteredDeviceGroups = useMemo(() => {
     const q = search.trim().toLowerCase();
 
     return devicesData
       .map((root) => ({
         ...root,
         repos: root.repos.filter((repo) => {
-          if (tags[repo.path]) return false;
           if (!q) return true;
 
           return (
@@ -120,7 +62,7 @@ function HomePage() {
         }),
       }))
       .filter((root) => root.repos.length > 0);
-  }, [devicesData, search, tags]);
+  }, [devicesData, search]);
 
   // keyboard shortcuts
   useEffect(() => {
@@ -218,62 +160,6 @@ function HomePage() {
     container.scrollTo({ top: offset, behavior: "smooth" });
   };
 
-  // Sensors
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8, // 需要拖拽一点距离才开始，这样点击就不会被误触
-      },
-    }),
-  );
-
-  // Drag handlers
-  const handleDragStart = (event: DragStartEvent) => {
-    const data = event.active.data.current as Partial<ActiveDrag> | undefined;
-    setActiveDrag({
-      path: data?.path ?? String(event.active.id),
-      source: data?.source ?? "catalog",
-    });
-  };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    const activeData = active.data.current as Partial<ActiveDrag> | undefined;
-    const activePath = activeData?.path ?? activeDrag?.path ?? String(active.id);
-    const activeSource = activeData?.source ?? activeDrag?.source ?? "catalog";
-
-    if (!over) {
-      setActiveDrag(null);
-      return;
-    }
-
-    const overData = over.data.current as DropData | undefined;
-    let targetTag: RepoTag | null = null;
-    let shouldUpdate = false;
-
-    if (overData?.type === "categoryPane") {
-      targetTag = { category: overData.category, workDir: overData.workDir };
-      shouldUpdate = !sameTag(tags[activePath], targetTag);
-    } else if (overData?.type === "repoList" && activeSource === "category") {
-      targetTag = null;
-      shouldUpdate = Boolean(tags[activePath]);
-    }
-
-    const repoExists = allRepos.some((r) => r.path === activePath);
-    if (repoExists && shouldUpdate) {
-      handleTag(activePath, targetTag);
-    }
-
-    setActiveDrag(null);
-  };
-
-  const handleDragCancel = (_event: DragCancelEvent) => {
-    setActiveDrag(null);
-  };
-
-  // Find active repo
-  const activeRepo = activeDrag ? allRepos.find((r) => r.path === activeDrag.path) : null;
-
   const cacheAge = dataUpdatedAt ? Math.floor((Date.now() - dataUpdatedAt) / 60_000) : null;
 
   return (
@@ -333,135 +219,114 @@ function HomePage() {
             <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
             刷新
           </Button>
+          <Button asChild size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1.5">
+            <Link to="/organize">
+              <Tags className="h-3.5 w-3.5" />
+              整理
+            </Link>
+          </Button>
           <FullscreenButton />
         </div>
       </header>
 
       {/* ── Body ── */}
-      <DndContext
-        sensors={sensors}
-        collisionDetection={pointerWithin}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-        onDragCancel={handleDragCancel}
-      >
-        <div className="flex flex-1 overflow-hidden p-4 gap-4">
-          {/* ── Left: Category Panels (60%) ── */}
-          <div className="flex-3 flex min-h-0 min-w-0 flex-col gap-4 w-[60%]">
-            <div className="grid min-h-0 flex-1 grid-cols-2 auto-rows-fr gap-4 overflow-hidden">
-              {leftGroups.map((group) => (
-                <CategoryPane
-                  key={group.id}
-                  id={group.id}
-                  category={group.category}
-                  workDir={group.workDir}
-                  repos={group.repos}
-                  tags={tags}
-                  workDirs={workDirs}
-                  agentOnline={agentStatus?.online ?? false}
-                  onOpen={handleOpen}
-                  onTag={handleTag}
-                  onAddWorkDir={handleAddWorkDir}
-                />
-              ))}
-            </div>
+      <div className="flex flex-1 overflow-hidden p-4 gap-4">
+        {/* ── Left: Category Panels (60%) ── */}
+        <div className="flex-3 flex min-h-0 min-w-0 flex-col gap-4 w-[60%]">
+          <div className="grid min-h-0 flex-1 grid-cols-2 auto-rows-fr gap-4 overflow-hidden">
+            {leftGroups.map((group) => (
+              <CategoryPane
+                key={group.id}
+                id={group.id}
+                category={group.category}
+                workDir={group.workDir}
+                repos={group.repos}
+                tags={tags}
+                workDirs={workDirs}
+                agentOnline={agentStatus?.online ?? false}
+                onOpen={handleOpen}
+                onTag={handleTag}
+                onAddWorkDir={handleAddWorkDir}
+              />
+            ))}
           </div>
-
-          {/* ── Right: Repo List (40%) ── */}
-          <RepoListDropArea categoryDragActive={activeDrag?.source === "category"}>
-            {/* Anchor tabs */}
-            <div className="flex items-center gap-1.5 px-4 py-2 border-b border-border/30 shrink-0 flex-wrap">
-              {devicesData.map((root) => (
-                <Button
-                  key={root.path}
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
-                  onClick={() => scrollToSection(root.path)}
-                >
-                  <span className="font-mono">{root.path.replace(/^\/Users\/[^/]+/, "~")}</span>
-                  <Badge variant="secondary" className="text-[10px] px-1 py-0">
-                    {root.repos.filter((repo) => !tags[repo.path]).length}
-                  </Badge>
-                </Button>
-              ))}
-            </div>
-
-            {/* Scrollable grid */}
-            <ScrollArea viewportRef={mainScrollRef} className="flex-1 min-h-0">
-              <div className="p-4 space-y-8">
-                {devicesLoading && (
-                  <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">
-                    加载中…
-                  </div>
-                )}
-
-                {/* 显示过滤后的分组 */}
-                {(() => {
-                  if (!devicesLoading && visibleDeviceGroups.length === 0) {
-                    return (
-                      <div className="flex flex-col items-center justify-center h-40 gap-2 text-muted-foreground">
-                        <span className="text-sm">
-                          {search ? "无未分类匹配结果" : "没有未分类 repo"}
-                        </span>
-                      </div>
-                    );
-                  }
-
-                  return visibleDeviceGroups.map((root) => (
-                    <section
-                      key={root.path}
-                      ref={(el) => {
-                        sectionRefs.current[root.path] = el;
-                      }}
-                    >
-                      <div className="mb-3 flex items-center gap-2 sticky top-0 bg-card/90 backdrop-blur-md z-50 py-2">
-                        <h2 className="font-mono text-xs font-semibold text-muted-foreground">
-                          {root.path.replace(/^\/Users\/[^/]+/, "~")}
-                        </h2>
-                        <Badge variant="secondary" className="text-[10px] px-1.5">
-                          {root.repos.length}
-                        </Badge>
-                      </div>
-                      <div className="grid gap-2 grid-cols-[repeat(auto-fill,minmax(260px,1fr))]">
-                        {root.repos.map((repo) => (
-                          <DraggableRepoCard
-                            key={repo.path}
-                            source="catalog"
-                            repo={repo}
-                            tag={tags[repo.path]}
-                            workDirs={workDirs}
-                            agentOnline={agentStatus?.online ?? false}
-                            onOpen={handleOpen}
-                            onTag={handleTag}
-                            onAddWorkDir={handleAddWorkDir}
-                          />
-                        ))}
-                      </div>
-                    </section>
-                  ));
-                })()}
-              </div>
-            </ScrollArea>
-          </RepoListDropArea>
         </div>
 
-        {/* Drag Overlay */}
-        <DragOverlay>
-          {activeRepo ? (
-            <RepoCard
-              repo={activeRepo}
-              tag={tags[activeRepo.path]}
-              workDirs={workDirs}
-              agentOnline={agentStatus?.online ?? false}
-              onOpen={async () => {}}
-              onTag={() => {}}
-              onAddWorkDir={() => {}}
-              dragOverlay
-            />
-          ) : null}
-        </DragOverlay>
-      </DndContext>
+        {/* ── Right: Repo List (40%) ── */}
+        <div className="flex-2 min-w-0 border border-border/30 rounded-xl bg-card/20 w-[40%] flex flex-col overflow-hidden">
+          {/* Anchor tabs */}
+          <div className="flex items-center gap-1.5 px-4 py-2 border-b border-border/30 shrink-0 flex-wrap">
+            {devicesData.map((root) => (
+              <Button
+                key={root.path}
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
+                onClick={() => scrollToSection(root.path)}
+              >
+                <span className="font-mono">{root.path.replace(/^\/Users\/[^/]+/, "~")}</span>
+                <Badge variant="secondary" className="text-[10px] px-1 py-0">
+                  {root.repos.length}
+                </Badge>
+              </Button>
+            ))}
+          </div>
+
+          {/* Scrollable grid */}
+          <ScrollArea viewportRef={mainScrollRef} className="flex-1 min-h-0">
+            <div className="p-4 space-y-8">
+              {devicesLoading && (
+                <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">
+                  加载中…
+                </div>
+              )}
+
+              {/* 显示过滤后的分组 */}
+              {(() => {
+                if (!devicesLoading && filteredDeviceGroups.length === 0) {
+                  return (
+                    <div className="flex flex-col items-center justify-center h-40 gap-2 text-muted-foreground">
+                      <span className="text-sm">{search ? "无匹配结果" : "未找到 repo"}</span>
+                    </div>
+                  );
+                }
+
+                return filteredDeviceGroups.map((root) => (
+                  <section
+                    key={root.path}
+                    ref={(el) => {
+                      sectionRefs.current[root.path] = el;
+                    }}
+                  >
+                    <div className="mb-3 flex items-center gap-2 sticky top-0 bg-card/90 backdrop-blur-md z-50 py-2">
+                      <h2 className="font-mono text-xs font-semibold text-muted-foreground">
+                        {root.path.replace(/^\/Users\/[^/]+/, "~")}
+                      </h2>
+                      <Badge variant="secondary" className="text-[10px] px-1.5">
+                        {root.repos.length}
+                      </Badge>
+                    </div>
+                    <div className="grid gap-2 grid-cols-[repeat(auto-fill,minmax(260px,1fr))]">
+                      {root.repos.map((repo) => (
+                        <RepoCard
+                          key={repo.path}
+                          repo={repo}
+                          tag={tags[repo.path]}
+                          workDirs={workDirs}
+                          agentOnline={agentStatus?.online ?? false}
+                          onOpen={handleOpen}
+                          onTag={handleTag}
+                          onAddWorkDir={handleAddWorkDir}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                ));
+              })()}
+            </div>
+          </ScrollArea>
+        </div>
+      </div>
     </div>
   );
 }
