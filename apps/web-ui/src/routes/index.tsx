@@ -15,6 +15,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "#/components/ui/dropdown-menu";
+import { ScrollArea } from "#/components/ui/scroll-area";
 import { toast } from "sonner";
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import {
@@ -31,7 +32,33 @@ import {
   Minimize,
   Search,
   FolderOpen,
+  GripVertical,
 } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragOverlay,
+  type DragStartEvent,
+  type DragOverEvent,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 export const Route = createFileRoute("/")({ component: HomePage });
 
@@ -122,11 +149,34 @@ function relativeTime(ms: number): string {
   return new Date(ms).toLocaleDateString("zh-CN", { month: "short", day: "numeric" });
 }
 
-const CAT_META: Record<Category, { icon: React.ReactNode; label: string; color: string }> = {
-  goal: { icon: <Star className="h-3 w-3" />, label: "Goal", color: "text-amber-400" },
-  work: { icon: <Briefcase className="h-3 w-3" />, label: "工作", color: "text-blue-400" },
-  life: { icon: <Home className="h-3 w-3" />, label: "生活", color: "text-emerald-400" },
-  explore: { icon: <Compass className="h-3 w-3" />, label: "探索", color: "text-purple-400" },
+const CAT_META: Record<
+  Category,
+  { icon: React.ReactNode; label: string; color: string; bg: string }
+> = {
+  goal: {
+    icon: <Star className="h-3 w-3" />,
+    label: "Goal",
+    color: "text-amber-400",
+    bg: "bg-amber-500/10",
+  },
+  work: {
+    icon: <Briefcase className="h-3 w-3" />,
+    label: "工作",
+    color: "text-blue-400",
+    bg: "bg-blue-500/10",
+  },
+  life: {
+    icon: <Home className="h-3 w-3" />,
+    label: "生活",
+    color: "text-emerald-400",
+    bg: "bg-emerald-500/10",
+  },
+  explore: {
+    icon: <Compass className="h-3 w-3" />,
+    label: "探索",
+    color: "text-purple-400",
+    bg: "bg-purple-500/10",
+  },
 };
 
 // ── FullscreenButton ──────────────────────────────────────────────────────────
@@ -163,7 +213,9 @@ interface RepoCardProps {
   onOpen: (path: string) => Promise<void>;
   onTag: (path: string, tag: RepoTag | null) => void;
   onAddWorkDir: (dir: string) => void;
-  cardRef?: (el: HTMLDivElement | null) => void;
+  isDragging?: boolean;
+  dragOverlay?: boolean;
+  showDragHandle?: boolean;
 }
 
 function RepoCard({
@@ -174,7 +226,9 @@ function RepoCard({
   onOpen,
   onTag,
   onAddWorkDir,
-  cardRef,
+  isDragging,
+  dragOverlay,
+  showDragHandle,
 }: RepoCardProps) {
   const [loading, setLoading] = useState(false);
   const [clicks, setClicks] = useState(() => getClickCount(repo.path));
@@ -198,12 +252,22 @@ function RepoCard({
 
   return (
     <div
-      ref={cardRef}
-      data-repo-path={repo.path}
-      className="flex flex-col gap-1.5 rounded-xl border bg-card px-4 pt-3 pb-2.5 transition-colors hover:border-border/80 hover:bg-accent/10"
+      className={cn(
+        "flex flex-col gap-1.5 rounded-xl border bg-card px-4 pt-3 pb-2.5 transition-all hover:border-border/80 hover:bg-accent/10",
+        isDragging && !dragOverlay && "opacity-50",
+        dragOverlay && "opacity-90 cursor-grabbing shadow-2xl",
+      )}
+      style={dragOverlay ? { transform: "rotate(1deg)" } : undefined}
     >
       <div className="flex items-start justify-between gap-2">
-        <span className="font-mono text-sm font-semibold leading-tight break-all">{repo.repo}</span>
+        <div className="flex items-start gap-2 min-w-0">
+          {showDragHandle && (
+            <GripVertical className="h-4 w-4 text-muted-foreground/40 shrink-0 mt-0.5 cursor-grab active:cursor-grabbing" />
+          )}
+          <span className="font-mono text-sm font-semibold leading-tight break-all min-w-0">
+            {repo.repo}
+          </span>
+        </div>
         {tag && (
           <span
             className={`shrink-0 flex items-center gap-1 text-[10px] ${CAT_META[tag.category].color}`}
@@ -318,6 +382,105 @@ function RepoCard({
   );
 }
 
+// ── Sortable Repo Card for Left Pane ──────────────────────────────────────────
+
+interface SortableRepoCardProps extends RepoCardProps {
+  id: string;
+}
+
+function SortableRepoCard({ id, ...props }: SortableRepoCardProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+  });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+  return (
+    <div ref={setNodeRef} style={style} className="relative">
+      <RepoCard {...props} isDragging={isDragging} />
+      <div className="absolute inset-0 z-10" {...attributes} {...listeners} />
+    </div>
+  );
+}
+
+// ── Category Pane ─────────────────────────────────────────────────────────────
+
+interface CategoryPaneProps {
+  category: Category;
+  workDir?: string;
+  repos: Repo[];
+  tags: Record<string, RepoTag>;
+  workDirs: string[];
+  agentOnline: boolean;
+  onOpen: (path: string) => Promise<void>;
+  onTag: (path: string, tag: RepoTag | null) => void;
+  onAddWorkDir: (dir: string) => void;
+  isOver?: boolean;
+}
+
+function CategoryPane({
+  category,
+  workDir,
+  repos,
+  tags,
+  workDirs,
+  agentOnline,
+  onOpen,
+  onTag,
+  onAddWorkDir,
+  isOver,
+}: CategoryPaneProps) {
+  const meta = CAT_META[category];
+  const label = workDir ?? meta.label;
+  const ids = repos.map((r) => r.path);
+
+  return (
+    <div
+      className={cn(
+        "flex-1 min-w-0 border rounded-xl p-4 transition-all",
+        isOver ? "border-ring/50 bg-ring/5" : "border-border/30 bg-card/30",
+      )}
+    >
+      <div className="flex items-center gap-2 mb-3">
+        <div className={cn("p-1.5 rounded-md", meta.bg)}>{meta.icon}</div>
+        <span className={cn("text-xs font-semibold uppercase tracking-wide", meta.color)}>
+          {label}
+        </span>
+        <Badge variant="outline" className="text-[10px] px-1.5 ml-auto">
+          {repos.length}
+        </Badge>
+      </div>
+
+      <ScrollArea className="h-[calc(100%-40px)]">
+        {repos.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-24 gap-1 text-muted-foreground/40 text-xs">
+            <p>拖入项目</p>
+          </div>
+        ) : (
+          <SortableContext items={ids} strategy={verticalListSortingStrategy}>
+            <div className="space-y-2 pr-2">
+              {repos.map((repo) => (
+                <SortableRepoCard
+                  key={repo.path}
+                  id={repo.path}
+                  repo={repo}
+                  tag={tags[repo.path]}
+                  workDirs={workDirs}
+                  agentOnline={agentOnline}
+                  onOpen={onOpen}
+                  onTag={onTag}
+                  onAddWorkDir={onAddWorkDir}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        )}
+      </ScrollArea>
+    </div>
+  );
+}
+
 // ── HomePage ──────────────────────────────────────────────────────────────────
 
 function HomePage() {
@@ -325,11 +488,13 @@ function HomePage() {
   const [search, setSearch] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
   const inFlight = useRef<Set<string>>(new Set());
-  const mainScrollRef = useRef<HTMLDivElement>(null);
-  const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const [tags, setTagsState] = useState<Record<string, RepoTag>>(readAllTags);
   const [workDirs, setWorkDirsState] = useState<string[]>(readWorkDirs);
+
+  // Drag state
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
 
   const devicesQueryOptions = orpc.devices.list.queryOptions();
   const {
@@ -399,27 +564,21 @@ function HomePage() {
     });
   }, []);
 
-  // Filtered repos for right panel (search only, no category filter)
-  const filteredGroups = useMemo(() => {
+  // Filtered repos for right panel (search only)
+  const filteredRepos = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return devicesData
-      .map((root) => ({
-        ...root,
-        repos: q
-          ? root.repos.filter(
-              (r) =>
-                r.repo.toLowerCase().includes(q) ||
-                r.path.toLowerCase().includes(q) ||
-                (r.description?.toLowerCase().includes(q) ?? false),
-            )
-          : root.repos,
-      }))
-      .filter((r) => r.repos.length > 0);
-  }, [devicesData, search]);
+    if (!q) return allRepos;
+    return allRepos.filter(
+      (r) =>
+        r.repo.toLowerCase().includes(q) ||
+        r.path.toLowerCase().includes(q) ||
+        (r.description?.toLowerCase().includes(q) ?? false),
+    );
+  }, [allRepos, search]);
 
-  // Left column: categorized repos grouped
+  // Left panes grouped
   const leftGroups = useMemo(() => {
-    const result: Array<{ category: Category; workDir?: string; repos: Repo[] }> = [];
+    const result: Array<{ category: Category; workDir?: string; repos: Repo[]; id: string }> = [];
     const catGroups = new Map<string, Repo[]>();
     for (const [path, tag] of Object.entries(tags)) {
       const repo = allRepos.find((r) => r.path === path);
@@ -429,38 +588,90 @@ function HomePage() {
       list.push(repo);
       catGroups.set(key, list);
     }
-    for (const cat of ["goal", "work", "life", "explore"] as Category[]) {
-      const plain = catGroups.get(cat);
-      if (plain?.length) result.push({ category: cat, repos: plain });
-      // work sub-dirs
-      if (cat === "work") {
-        for (const dir of workDirs) {
-          const sub = catGroups.get(`work::${dir}`);
-          if (sub?.length) result.push({ category: "work", workDir: dir, repos: sub });
-        }
-      }
+    // Goal
+    const goalRepos = catGroups.get("goal") ?? [];
+    result.push({ category: "goal", repos: goalRepos, id: "pane-goal" });
+    // Work + sub-dirs
+    const workRepos = catGroups.get("work") ?? [];
+    if (workRepos.length) result.push({ category: "work", repos: workRepos, id: "pane-work" });
+    for (const dir of workDirs) {
+      const sub = catGroups.get(`work::${dir}`);
+      if (sub?.length)
+        result.push({ category: "work", workDir: dir, repos: sub, id: `pane-work-${dir}` });
     }
+    // Life
+    const lifeRepos = catGroups.get("life") ?? [];
+    result.push({ category: "life", repos: lifeRepos, id: "pane-life" });
+    // Explore
+    const exploreRepos = catGroups.get("explore") ?? [];
+    result.push({ category: "explore", repos: exploreRepos, id: "pane-explore" });
     return result;
   }, [tags, allRepos, workDirs]);
 
-  const scrollToSection = (path: string) => {
-    const section = sectionRefs.current[path];
-    const container = mainScrollRef.current;
-    if (!section || !container) return;
-    const offset =
-      section.getBoundingClientRect().top -
-      container.getBoundingClientRect().top +
-      container.scrollTop -
-      8;
-    container.scrollTo({ top: offset, behavior: "smooth" });
+  // Sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+
+  // Drag handlers
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+    setOverId(null);
   };
+
+  const handleDragOver = (event: DragOverEvent) => {
+    const { over } = event;
+    setOverId(over?.id as string | null);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over) {
+      setActiveId(null);
+      setOverId(null);
+      return;
+    }
+
+    const activeId = active.id as string;
+    const overId = over.id as string;
+
+    // Case 1: over a pane id (starts with "pane-")
+    if (overId.startsWith("pane-")) {
+      // Parse target from pane id
+      // format: pane-goal, pane-work, pane-work-dirName, pane-life, pane-explore
+      const parts = overId.split("-");
+      const targetCategory = parts[1] as Category;
+      const targetWorkDir =
+        parts[0] === "pane" && parts[1] === "work" && parts.length > 2
+          ? parts.slice(2).join("-")
+          : undefined;
+
+      const repo = allRepos.find((r) => r.path === activeId);
+      if (repo) {
+        handleTag(activeId, { category: targetCategory, workDir: targetWorkDir });
+      }
+    }
+
+    setActiveId(null);
+    setOverId(null);
+  };
+
+  // Find active repo
+  const activeRepo = activeId ? allRepos.find((r) => r.path === activeId) : null;
 
   const cacheAge = dataUpdatedAt ? Math.floor((Date.now() - dataUpdatedAt) / 60_000) : null;
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
+    <div className="flex h-screen flex-col overflow-hidden bg-black text-foreground">
       {/* ── Header ── */}
-      <header className="flex items-center gap-3 border-b px-5 py-2.5 shrink-0">
+      <header className="flex items-center gap-3 border-b border-border/30 px-5 py-2.5 shrink-0 bg-black/95">
         <div className="flex items-center gap-2 shrink-0">
           <FolderSearch className="h-4 w-4 text-primary" />
           <span className="text-sm font-semibold">Foyer</span>
@@ -476,7 +687,7 @@ function HomePage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="搜索 repo… ( / )"
-            className="pl-8 h-8 text-xs"
+            className="pl-8 h-8 text-xs bg-transparent"
           />
         </div>
 
@@ -519,114 +730,121 @@ function HomePage() {
       </header>
 
       {/* ── Body ── */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* ── Left column: categorized repos ── */}
-        <aside className="w-52 shrink-0 border-r overflow-y-auto py-3">
-          {leftGroups.length === 0 ? (
-            <div className="px-4 py-6 text-center text-xs text-muted-foreground/50">
-              <p>暂无标记</p>
-              <p className="mt-1">点击卡片 ⋯ 标记项目</p>
-            </div>
-          ) : (
-            leftGroups.map((group, i) => {
-              const meta = CAT_META[group.category];
-              const label = group.workDir ?? meta.label;
-              return (
-                <div key={i} className="mb-3">
-                  <div
-                    className={`flex items-center gap-1.5 px-4 pb-1.5 text-[11px] font-semibold uppercase tracking-wide ${meta.color}`}
-                  >
-                    {meta.icon}
-                    {label}
-                    <span className="ml-auto font-normal opacity-60">{group.repos.length}</span>
-                  </div>
-                  {group.repos.map((repo) => (
-                    <button
-                      key={repo.path}
-                      className="w-full px-4 py-1 text-left text-xs font-mono text-muted-foreground hover:text-foreground hover:bg-accent transition-colors truncate"
-                      onClick={() => {
-                        const el = document.querySelector(
-                          `[data-repo-path="${CSS.escape(repo.path)}"]`,
-                        );
-                        el?.scrollIntoView({ behavior: "smooth", block: "center" });
-                      }}
-                    >
-                      {repo.repo}
-                    </button>
-                  ))}
-                </div>
-              );
-            })
-          )}
-        </aside>
-
-        {/* ── Right: anchor tabs + scrollable grid ── */}
-        <div className="flex flex-1 flex-col overflow-hidden">
-          {/* Anchor tabs */}
-          <div className="flex items-center gap-1.5 px-5 py-2 border-b shrink-0 flex-wrap">
-            {devicesData.map((root) => (
-              <button
-                key={root.path}
-                onClick={() => scrollToSection(root.path)}
-                className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-              >
-                <span className="font-mono">{root.path.replace(/^\/Users\/[^/]+/, "~")}</span>
-                <Badge variant="secondary" className="text-[10px] px-1 py-0">
-                  {root.repos.length}
-                </Badge>
-              </button>
-            ))}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="flex flex-1 overflow-hidden p-4 gap-4">
+          {/* ── Left: Category Panels (60%) ── */}
+          <div className="flex-[3] min-w-0 flex flex-col gap-4">
+            <ScrollArea className="flex-1">
+              <div className="grid grid-cols-2 gap-4 pr-2">
+                {leftGroups.map((group) => (
+                  <CategoryPane
+                    key={group.id}
+                    category={group.category}
+                    workDir={group.workDir}
+                    repos={group.repos}
+                    tags={tags}
+                    workDirs={workDirs}
+                    agentOnline={agentStatus?.online ?? false}
+                    onOpen={handleOpen}
+                    onTag={handleTag}
+                    onAddWorkDir={handleAddWorkDir}
+                    isOver={overId === group.id}
+                  />
+                ))}
+                {/* Show placeholders if empty */}
+                {leftGroups.length === 0 && (
+                  <>
+                    {["goal", "work", "life", "explore"].map((cat) => (
+                      <CategoryPane
+                        key={`placeholder-${cat}`}
+                        category={cat as Category}
+                        repos={[]}
+                        tags={{}}
+                        workDirs={workDirs}
+                        agentOnline={false}
+                        onOpen={async () => {}}
+                        onTag={() => {}}
+                        onAddWorkDir={() => {}}
+                        isOver={overId === `pane-${cat}`}
+                      />
+                    ))}
+                  </>
+                )}
+              </div>
+            </ScrollArea>
           </div>
 
-          {/* Scrollable grid */}
-          <div ref={mainScrollRef} className="flex-1 overflow-y-auto px-6 py-4 space-y-10">
-            {devicesLoading && (
-              <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">
-                加载中…
-              </div>
-            )}
-
-            {!devicesLoading && filteredGroups.length === 0 && (
-              <div className="flex flex-col items-center justify-center h-40 gap-2 text-muted-foreground">
-                <FolderOpen className="h-8 w-8 opacity-30" />
-                <span className="text-sm">{search ? "无匹配结果" : "未找到 repo"}</span>
-              </div>
-            )}
-
-            {filteredGroups.map((root) => (
-              <section
-                key={root.path}
-                ref={(el) => {
-                  sectionRefs.current[root.path] = el;
-                }}
-              >
-                <div className="mb-3 flex items-center gap-2">
-                  <h2 className="font-mono text-xs font-semibold text-muted-foreground">
-                    {root.path.replace(/^\/Users\/[^/]+/, "~")}
-                  </h2>
-                  <Badge variant="secondary" className="text-[10px] px-1.5">
-                    {root.repos.length}
-                  </Badge>
+          {/* ── Right: Repo List (40%) ── */}
+          <div className="flex-[2] min-w-0 border border-border/30 rounded-xl bg-card/20">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border/30">
+              <span className="text-xs font-semibold text-muted-foreground">全部项目</span>
+              <Badge variant="outline" className="text-[10px] px-1.5">
+                {filteredRepos.length}
+              </Badge>
+            </div>
+            <ScrollArea className="h-[calc(100%-48px)]">
+              {devicesLoading && (
+                <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">
+                  加载中…
                 </div>
-                <div className="grid gap-2 grid-cols-[repeat(auto-fill,minmax(260px,1fr))]">
-                  {root.repos.map((repo) => (
-                    <RepoCard
-                      key={repo.path}
-                      repo={repo}
-                      tag={tags[repo.path]}
-                      workDirs={workDirs}
-                      agentOnline={agentStatus?.online ?? false}
-                      onOpen={handleOpen}
-                      onTag={handleTag}
-                      onAddWorkDir={handleAddWorkDir}
-                    />
+              )}
+
+              {!devicesLoading && filteredRepos.length === 0 && (
+                <div className="flex flex-col items-center justify-center h-40 gap-2 text-muted-foreground">
+                  <FolderOpen className="h-8 w-8 opacity-30" />
+                  <span className="text-sm">{search ? "无匹配结果" : "未找到 repo"}</span>
+                </div>
+              )}
+
+              <SortableContext
+                items={filteredRepos.map((r) => r.path)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="p-4 space-y-2">
+                  {filteredRepos.map((repo) => (
+                    <div key={repo.path} className="relative group">
+                      {/* Overlay for drag handle */}
+                      <div className="absolute inset-0 z-10" />
+                      <RepoCard
+                        repo={repo}
+                        tag={tags[repo.path]}
+                        workDirs={workDirs}
+                        agentOnline={agentStatus?.online ?? false}
+                        onOpen={handleOpen}
+                        onTag={handleTag}
+                        onAddWorkDir={handleAddWorkDir}
+                        showDragHandle
+                      />
+                    </div>
                   ))}
                 </div>
-              </section>
-            ))}
+              </SortableContext>
+            </ScrollArea>
           </div>
         </div>
-      </div>
+
+        {/* Drag Overlay */}
+        <DragOverlay>
+          {activeRepo ? (
+            <RepoCard
+              repo={activeRepo}
+              tag={tags[activeRepo.path]}
+              workDirs={workDirs}
+              agentOnline={agentStatus?.online ?? false}
+              onOpen={async () => {}}
+              onTag={() => {}}
+              onAddWorkDir={() => {}}
+              dragOverlay
+            />
+          ) : null}
+        </DragOverlay>
+      </DndContext>
     </div>
   );
 }
