@@ -18,9 +18,15 @@ export function DraggableRepoCard({ id, ...props }: DraggableRepoCardProps) {
 
   return (
     <div ref={setNodeRef} className="relative">
-      {/* 拖拽手柄层 - 覆盖整个卡片，但需要排除按钮区域 */}
-      <div className="absolute inset-0 z-10" {...attributes} {...listeners} />
-      <RepoCard {...props} isDragging={isDragging} showDragHandle />
+      {/* 拖拽手柄层 - 但是用 pointer-events 来排除按钮区域 */}
+      <div
+        className="absolute inset-0 z-10 cursor-grab active:cursor-grabbing"
+        {...attributes}
+        {...listeners}
+      />
+      <div className="relative z-20">
+        <RepoCard {...props} isDragging={isDragging} showDragHandle />
+      </div>
     </div>
   );
 }
