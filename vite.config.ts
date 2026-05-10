@@ -14,6 +14,14 @@ const ignoredGeneratedPaths = [
 ];
 
 export default defineConfig({
+  run: {
+    tasks: {
+      "link:cli": {
+        command: "pnpm run build && pnpm link -g",
+        cwd: "packages/cli",
+      },
+    },
+  },
   staged: {
     "*": "vp check --fix",
   },

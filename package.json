@@ -7,6 +7,7 @@
     "build": "pnpm -r --if-present build",
     "check": "pnpm -r --if-present check",
     "cli": "pnpm --dir packages/cli cli",
+    "dev:web": "pnpm --dir apps/web-ui dev",
     "test": "pnpm -r --if-present test",
     "flue:dev": "flue dev --target node --output .flue-dist",
     "flue:run": "flue run project-init --target node --output .flue-dist",
