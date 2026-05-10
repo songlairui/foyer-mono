@@ -129,15 +129,16 @@ describe("repoDevicesMulti", () => {
     await writeFile(path.join(rootB, "repo-beta", ".git", "HEAD"), "ref: refs/heads/main\n");
 
     const result = await runFsShell(repoDevicesMulti({ roots: [rootA, rootB] }));
+    const devices = result.devices;
 
-    expect(result).toHaveLength(2);
-    const names = result.map((r) => r.repo);
+    expect(devices).toHaveLength(2);
+    const names = devices.map((r) => r.repo);
     expect(names).toContain("repo-alpha");
     expect(names).toContain("repo-beta");
 
-    const alpha = result.find((r) => r.repo === "repo-alpha")!;
+    const alpha = devices.find((r) => r.repo === "repo-alpha")!;
     expect(alpha.scanRoot).toBe(rootA);
-    const beta = result.find((r) => r.repo === "repo-beta")!;
+    const beta = devices.find((r) => r.repo === "repo-beta")!;
     expect(beta.scanRoot).toBe(rootB);
   });
 
@@ -148,14 +149,14 @@ describe("repoDevicesMulti", () => {
     await writeFile(path.join(sharedRoot, "shared-repo", ".git", "HEAD"), "ref: refs/heads/main\n");
 
     const result = await runFsShell(repoDevicesMulti({ roots: [sharedRoot, sharedRoot] }));
-    expect(result).toHaveLength(1);
-    expect(result[0].repo).toBe("shared-repo");
+    expect(result.devices).toHaveLength(1);
+    expect(result.devices[0].repo).toBe("shared-repo");
   });
 
   it("returns empty array when all roots are missing", async () => {
     const tmp = await tempRoot();
     const result = await runFsShell(repoDevicesMulti({ roots: [path.join(tmp, "nonexistent")] }));
-    expect(result).toEqual([]);
+    expect(result.devices).toEqual([]);
   });
 
   it("adds scanRoot field to each result", async () => {
@@ -165,9 +166,9 @@ describe("repoDevicesMulti", () => {
     await writeFile(path.join(rootA, "my-repo", ".git", "HEAD"), "ref: refs/heads/main\n");
 
     const result = await runFsShell(repoDevicesMulti({ roots: [rootA] }));
-    expect(result).toHaveLength(1);
-    expect(result[0].scanRoot).toBe(rootA);
-    expect(result[0].repo).toBe("my-repo");
-    expect(typeof result[0].device).toBe("string");
+    expect(result.devices).toHaveLength(1);
+    expect(result.devices[0].scanRoot).toBe(rootA);
+    expect(result.devices[0].repo).toBe("my-repo");
+    expect(typeof result.devices[0].device).toBe("string");
   });
 });

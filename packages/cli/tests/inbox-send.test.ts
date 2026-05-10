@@ -107,7 +107,7 @@ describe("inbox send workflow", () => {
 });
 
 async function tempRoot(): Promise<string> {
-  const dir = await path.join(os.tmpdir(), `foyer-test-${Math.random().toString(16).slice(2)}`);
+  const dir = path.join(os.tmpdir(), `foyer-test-${Math.random().toString(16).slice(2)}`);
   await mkdir(dir, { recursive: true });
   tempDirs.push(dir);
   return dir;

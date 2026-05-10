@@ -10,14 +10,57 @@ import { resolveConfig, projectPath } from "../domain/paths";
 import { FileSystem, Shell } from "../services/context";
 import { listProjects } from "./project-init";
 
-export function repoDevices(input: { projectsRoot?: string; deviceName?: string }) {
+export type RepoDevice = { device: string; repo: string; path: string };
+export type RepoDeviceMulti = RepoDevice & { scanRoot: string };
+
+export interface RepoDevicesResult {
+  devices: RepoDevice[];
+  humanOutputZh: string;
+  humanSummaryZh: string;
+}
+
+export interface RepoDevicesMultiResult {
+  devices: RepoDeviceMulti[];
+  humanOutputZh: string;
+  humanSummaryZh: string;
+}
+
+function renderDevices(devices: RepoDevice[]): string {
+  if (devices.length === 0) return "（无仓库）\n";
+  return devices.map((d) => `  ${d.repo.padEnd(32)} ${d.path}`).join("\n") + "\n";
+}
+
+function renderDevicesMulti(devices: RepoDeviceMulti[]): string {
+  if (devices.length === 0) return "（无仓库）\n";
+  const byRoot = new Map<string, RepoDeviceMulti[]>();
+  for (const d of devices) {
+    const list = byRoot.get(d.scanRoot) ?? [];
+    list.push(d);
+    byRoot.set(d.scanRoot, list);
+  }
+  const lines: string[] = [];
+  for (const [root, repos] of [...byRoot].sort((a, b) => a[0].localeCompare(b[0]))) {
+    lines.push(`${root}`);
+    for (const r of repos) {
+      lines.push(`  ${r.repo.padEnd(32)} ${r.path}`);
+    }
+  }
+  return lines.join("\n") + "\n";
+}
+
+export function repoDevices(input: {
+  projectsRoot?: string;
+  deviceName?: string;
+}): Effect.Effect<RepoDevicesResult, EntryWorkflowError, FileSystem> {
   return Effect.gen(function* () {
     const config = resolveConfig({
       projectsRoot: input.projectsRoot,
       deviceName: input.deviceName,
     });
     const fs = yield* FileSystem;
-    if (!(yield* fs.exists(config.projectsRoot))) return [];
+    if (!(yield* fs.exists(config.projectsRoot))) {
+      return { devices: [], humanOutputZh: "（无仓库）\n", humanSummaryZh: "未找到仓库。" };
+    }
     const files = yield* fs.listFiles(config.projectsRoot);
     const roots = new Set<string>();
     for (const file of files) {
@@ -25,27 +68,29 @@ export function repoDevices(input: { projectsRoot?: string; deviceName?: string 
       const gitIndex = parts.lastIndexOf(".git");
       if (gitIndex > 0) roots.add(parts.slice(0, gitIndex).join(path.sep));
     }
-    return [...roots].sort().map((repoPath) => ({
+    const devices = [...roots].sort().map((repoPath) => ({
       device: config.deviceName,
       repo: path.basename(repoPath),
       path: repoPath,
     }));
+    return {
+      devices,
+      humanOutputZh: renderDevices(devices),
+      humanSummaryZh: `共 ${devices.length} 个仓库。`,
+    };
   });
 }
-
-export type RepoDevice = { device: string; repo: string; path: string };
-export type RepoDeviceMulti = RepoDevice & { scanRoot: string };
 
 export function repoDevicesMulti(input: {
   roots: string[];
   deviceName?: string;
-}): Effect.Effect<RepoDeviceMulti[], EntryWorkflowError, FileSystem> {
+}): Effect.Effect<RepoDevicesMultiResult, EntryWorkflowError, FileSystem> {
   return Effect.gen(function* () {
     const allResults = yield* Effect.forEach(
       input.roots,
       (root) =>
         repoDevices({ projectsRoot: root, deviceName: input.deviceName }).pipe(
-          Effect.map((repos) => repos.map((r) => ({ ...r, scanRoot: root }))),
+          Effect.map((result) => result.devices.map((r) => ({ ...r, scanRoot: root }))),
         ),
       { concurrency: "unbounded" },
     );
@@ -59,8 +104,26 @@ export function repoDevicesMulti(input: {
         }
       }
     }
-    return merged.sort((a, b) => a.path.localeCompare(b.path));
+    const devices = merged.sort((a, b) => a.path.localeCompare(b.path));
+    return {
+      devices,
+      humanOutputZh: renderDevicesMulti(devices),
+      humanSummaryZh: `${input.roots.length} 个扫描根，共 ${devices.length} 个仓库。`,
+    };
   });
+}
+
+export type RepoStatusItem = {
+  repo: string;
+  path: string;
+  dirty: boolean;
+  status: string;
+};
+
+export interface RepoStatusResult {
+  statuses: RepoStatusItem[];
+  humanOutputZh: string;
+  humanSummaryZh: string;
 }
 
 export function repoStatus(input: {
@@ -68,17 +131,14 @@ export function repoStatus(input: {
   roots?: string[];
   all?: boolean;
   deviceName?: string;
-}): Effect.Effect<
-  Array<{ repo: string; path: string; dirty: boolean; status: string }>,
-  EntryWorkflowError,
-  FileSystem | Shell
-> {
+}): Effect.Effect<RepoStatusResult, EntryWorkflowError, FileSystem | Shell> {
   return Effect.gen(function* () {
-    const repos = input.roots
+    const devicesResult = input.roots
       ? yield* repoDevicesMulti({ roots: input.roots, deviceName: input.deviceName })
       : yield* repoDevices(input);
+    const repos = devicesResult.devices;
     const shell = yield* Shell;
-    const statuses = [];
+    const statuses: RepoStatusItem[] = [];
     for (const repo of repos) {
       const result = yield* shell.run("git", ["status", "--short", "--branch"], {
         cwd: repo.path,
@@ -91,7 +151,13 @@ export function repoStatus(input: {
         status: result.stdout.trim(),
       });
     }
-    return statuses;
+    const dirtyCount = statuses.filter((s) => s.dirty).length;
+    const lines = statuses.map((s) => `  ${s.dirty ? "●" : "○"} ${s.repo.padEnd(32)} ${s.path}`);
+    return {
+      statuses,
+      humanOutputZh: lines.length > 0 ? lines.join("\n") + "\n" : "（无仓库）\n",
+      humanSummaryZh: `共 ${statuses.length} 个仓库，${dirtyCount} 个有变更。`,
+    };
   });
 }
 
@@ -151,8 +217,8 @@ export function repoPrepare(
     }
 
     const targetPath = projectPath(config, request.slug);
-    const devices = yield* repoDevices({ projectsRoot: config.projectsRoot });
-    const alreadyCloned = devices.some((d) => d.repo === request.slug);
+    const devicesResult = yield* repoDevices({ projectsRoot: config.projectsRoot });
+    const alreadyCloned = devicesResult.devices.some((d) => d.repo === request.slug);
 
     if (alreadyCloned) {
       const result: RepoPrepareResult = {

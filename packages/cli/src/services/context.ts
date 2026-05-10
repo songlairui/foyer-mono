@@ -1,5 +1,6 @@
 import { Context, Effect, Layer } from "effect";
 import { spawn } from "node:child_process";
+import type { Dirent } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { filesystemError, shellCommandFailed, type EntryWorkflowError } from "../domain/errors";
@@ -153,15 +154,41 @@ function runCommand(
 }
 
 async function listFilesRecursive(root: string): Promise<string[]> {
-  const entries = await fs.readdir(root, { withFileTypes: true });
   const files: string[] = [];
+  const stack: string[] = [root];
+  const visited = new Set<string>();
 
-  for (const entry of entries) {
-    const current = path.join(root, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...(await listFilesRecursive(current)));
-    } else if (entry.isFile()) {
-      files.push(current);
+  while (stack.length > 0) {
+    const current = stack.pop()!;
+
+    let real: string;
+    try {
+      real = await fs.realpath(current);
+    } catch {
+      continue;
+    }
+    if (visited.has(real)) continue;
+    visited.add(real);
+
+    let entries: Dirent[];
+    try {
+      entries = await fs.readdir(current, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      if (entry.name === "node_modules") continue;
+      const fullPath = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === ".git") {
+          files.push(fullPath);
+          continue;
+        }
+        if (entry.name.startsWith(".")) continue;
+        stack.push(fullPath);
+      } else if (entry.isFile()) {
+        files.push(fullPath);
+      }
     }
   }
 

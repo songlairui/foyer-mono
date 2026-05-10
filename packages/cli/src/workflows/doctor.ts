@@ -6,7 +6,7 @@ import { resolveConfig } from "../domain/paths";
 import { repoRootsList } from "../domain/scan-roots";
 import { FileSystem, Shell } from "../services/context";
 import { parseActivityEvent } from "./activity";
-import { repoDevices, repoStatus } from "./repo";
+import { repoDevices, repoStatus, type RepoDevice, type RepoStatusResult } from "./repo";
 
 export interface DoctorReport {
   kind: "entry-doctor-report";
@@ -120,12 +120,12 @@ export function runDoctor(input: {
     );
     const projectIndex = path.join(config.entryRoot, "projects", "index.md");
 
-    const repos = projectsRootExists
+    const reposResult = projectsRootExists
       ? yield* repoDevices({ projectsRoot: config.projectsRoot, deviceName: config.deviceName })
-      : [];
-    let statuses: Array<{ repo: string; path: string; dirty: boolean; status: string }> = [];
+      : { devices: [] as RepoDevice[] };
+    let statusesResult: RepoStatusResult = { statuses: [], humanOutputZh: "", humanSummaryZh: "" };
     if (projectsRootExists && (yield* shell.commandExists("git"))) {
-      statuses = yield* repoStatus({
+      statusesResult = yield* repoStatus({
         projectsRoot: config.projectsRoot,
         all: true,
         deviceName: config.deviceName,
@@ -196,12 +196,12 @@ export function runDoctor(input: {
         cursors: cursors.length,
       },
       repositories: {
-        localRepos: repos.length,
-        dirtyRepos: statuses.filter((status) => status.dirty).length,
-        statuses,
+        localRepos: reposResult.devices.length,
+        dirtyRepos: statusesResult.statuses.filter((status) => status.dirty).length,
+        statuses: statusesResult.statuses,
       },
       warnings,
-      humanSummaryZh: `doctor 完成：${events.length} 条 activity event，${projectPages.length} 个项目页，${repos.length} 个本地仓库，${warnings.length} 个提示。`,
+      humanSummaryZh: `doctor 完成：${events.length} 条 activity event，${projectPages.length} 个项目页，${reposResult.devices.length} 个本地仓库，${warnings.length} 个提示。`,
     };
   });
 }
