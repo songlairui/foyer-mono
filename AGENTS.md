@@ -1,3 +1,15 @@
+<!-- intent-skills:start -->
+
+## Skill Loading
+
+Before substantial work:
+
+- Skill check: run `pnpm dlx @tanstack/intent@latest list`, or use skills already listed in context.
+- Skill guidance: if one local skill clearly matches the task, run `pnpm dlx @tanstack/intent@latest load <package>#<skill>` and follow the returned `SKILL.md`.
+- Monorepos: when working across packages, run the skill check from the workspace root and prefer the local skill for the package being changed.
+- Multiple matches: prefer the most specific local skill for the package or concern you are changing; load additional skills only when the task spans multiple packages or concerns.
+<!-- intent-skills:end -->
+
 # Agent 开发规则
 
 本仓库是开发，迭代，优化 `init-project` 技能的源仓库
