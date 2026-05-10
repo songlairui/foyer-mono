@@ -115,12 +115,10 @@ function rectsIntersect(a: DOMRect, b: ReturnType<typeof normalizeBox>) {
 
 function RepoTileView({
   repo,
-  tag,
   isDragging,
   isSelected,
 }: {
   repo: Repo;
-  tag?: RepoTag;
   isDragging?: boolean;
   isSelected?: boolean;
 }) {
@@ -136,11 +134,6 @@ function RepoTileView({
         <div className="truncate font-mono text-xs font-semibold">{repo.repo}</div>
         <div className="truncate text-[10px] text-muted-foreground/55">{subtitle}</div>
       </div>
-      {tag ? (
-        <span className={`shrink-0 text-[10px] ${CAT_META[tag.category].color}`}>
-          {tag.category === "work" && tag.workDir ? tag.workDir : CAT_META[tag.category].label}
-        </span>
-      ) : null}
     </div>
   );
 }
@@ -148,14 +141,12 @@ function RepoTileView({
 function DraggableRepoTile({
   repo,
   source,
-  tag,
   isSelected,
   onToggle,
   registerTile,
 }: {
   repo: Repo;
   source: DragSource;
-  tag?: RepoTag;
   isSelected: boolean;
   onToggle: (path: string) => void;
   registerTile: (path: string, source: DragSource, node: HTMLElement | null) => void;
@@ -182,7 +173,7 @@ function DraggableRepoTile({
       onClick={() => onToggle(repo.path)}
       className="touch-none cursor-grab active:cursor-grabbing"
     >
-      <RepoTileView repo={repo} tag={tag} isDragging={isDragging} isSelected={isSelected} />
+      <RepoTileView repo={repo} isDragging={isDragging} isSelected={isSelected} />
     </div>
   );
 }
@@ -192,7 +183,6 @@ function CategoryDropPane({
   category,
   workDir,
   repos,
-  tags,
   selectedPaths,
   onToggle,
   registerTile,
@@ -204,7 +194,6 @@ function CategoryDropPane({
   category: Category;
   workDir?: string;
   repos: Repo[];
-  tags: Record<string, RepoTag>;
   selectedPaths: Set<string>;
   onToggle: (path: string) => void;
   registerTile: (path: string, source: DragSource, node: HTMLElement | null) => void;
@@ -252,7 +241,6 @@ function CategoryDropPane({
                 key={repo.path}
                 repo={repo}
                 source="category"
-                tag={tags[repo.path]}
                 isSelected={selectedPaths.has(repo.path)}
                 onToggle={onToggle}
                 registerTile={registerTile}
@@ -268,7 +256,6 @@ function CategoryDropPane({
 function UnclassifiedPane({
   groups,
   count,
-  tags,
   selectedPaths,
   onToggle,
   registerTile,
@@ -278,7 +265,6 @@ function UnclassifiedPane({
 }: {
   groups: RepoGroup[];
   count: number;
-  tags: Record<string, RepoTag>;
   selectedPaths: Set<string>;
   onToggle: (path: string) => void;
   registerTile: (path: string, source: DragSource, node: HTMLElement | null) => void;
@@ -326,7 +312,6 @@ function UnclassifiedPane({
                     key={repo.path}
                     repo={repo}
                     source="catalog"
-                    tag={tags[repo.path]}
                     isSelected={selectedPaths.has(repo.path)}
                     onToggle={onToggle}
                     registerTile={registerTile}
@@ -341,9 +326,9 @@ function UnclassifiedPane({
   );
 }
 
-function DragPreview({ repos, tags }: { repos: Repo[]; tags: Record<string, RepoTag> }) {
+function DragPreview({ repos }: { repos: Repo[] }) {
   if (repos.length === 1 && repos[0]) {
-    return <RepoTileView repo={repos[0]} tag={tags[repos[0].path]} isSelected />;
+    return <RepoTileView repo={repos[0]} isSelected />;
   }
 
   return (
@@ -665,7 +650,6 @@ function OrganizePage() {
                 category={group.category}
                 workDir={group.workDir}
                 repos={group.repos}
-                tags={tags}
                 selectedPaths={selectedPaths}
                 onToggle={toggleSelection}
                 registerTile={registerTile}
@@ -679,7 +663,6 @@ function OrganizePage() {
           <UnclassifiedPane
             groups={unclassifiedGroups}
             count={unclassifiedRepos.length}
-            tags={tags}
             selectedPaths={selectedPaths}
             onToggle={toggleSelection}
             registerTile={registerTile}
@@ -690,7 +673,7 @@ function OrganizePage() {
         </main>
 
         <DragOverlay>
-          {activeRepos.length > 0 ? <DragPreview repos={activeRepos} tags={tags} /> : null}
+          {activeRepos.length > 0 ? <DragPreview repos={activeRepos} /> : null}
         </DragOverlay>
       </DndContext>
 

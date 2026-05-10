@@ -50,49 +50,59 @@ export function RepoCard({
     <div
       ref={cardRef}
       data-repo-path={repo.path}
-      className={`group relative flex flex-col gap-1.5 rounded-xl border bg-card px-4 pt-3 pb-2.5 transition-all hover:border-border/80 hover:bg-accent/10 ${
+      className={`group flex flex-col gap-1 rounded-xl border bg-card px-4 pt-3 pb-2.5 transition-all hover:border-border/80 hover:bg-accent/10 ${
         isDragging && !dragOverlay ? "opacity-50" : ""
       } ${dragOverlay ? "opacity-90 cursor-grabbing shadow-2xl" : ""}`}
       style={dragOverlay ? { transform: "rotate(1deg)" } : undefined}
     >
-      {/* 打开按钮 - 右上角 */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="absolute right-1.5 top-1.5 h-6 w-6 p-0 text-muted-foreground/50 opacity-0 group-hover:opacity-100 hover:text-foreground hover:bg-accent transition-opacity"
-            onClick={handleOpen}
-            disabled={loading}
-          >
-            <ExternalLink className="h-3.5 w-3.5" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>打开</TooltipContent>
-      </Tooltip>
-
-      <div className="flex items-start gap-2 min-w-0">
+      {/* 标题行：拖拽手柄 + 项目名 + 打开按钮 */}
+      <div className="flex items-center gap-2 min-w-0">
         {showDragHandle && (
           <div
             {...dragHandleProps}
             aria-label={dragHandleProps?.["aria-label"] ?? "拖拽 repo"}
             className={cn(
-              "flex h-5 w-5 shrink-0 items-center justify-center -ml-1 mt-0.5 rounded text-muted-foreground/45 cursor-grab touch-none select-none transition-colors hover:bg-accent hover:text-foreground active:cursor-grabbing",
+              "flex h-5 w-5 shrink-0 items-center justify-center -ml-1 rounded text-muted-foreground/45 cursor-grab touch-none select-none transition-colors hover:bg-accent hover:text-foreground active:cursor-grabbing",
               dragHandleProps?.className,
             )}
           >
             <GripVertical className="h-4 w-4" />
           </div>
         )}
-        <span className="font-mono text-sm font-semibold leading-tight break-all min-w-0">
-          {repo.repo}
-        </span>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="truncate font-mono text-sm font-semibold leading-tight min-w-0 cursor-default">
+              {repo.repo}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{repo.repo}</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="ml-auto h-6 w-6 shrink-0 p-0 text-muted-foreground/50 hover:text-foreground hover:bg-accent"
+              onClick={handleOpen}
+              disabled={loading}
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>打开</TooltipContent>
+        </Tooltip>
       </div>
 
+      {/* 描述：最多一行，超出 Tooltip */}
       {repo.description && (
-        <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-          {repo.description}
-        </p>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <p className="text-xs text-muted-foreground truncate cursor-default">
+              {repo.description}
+            </p>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs">{repo.description}</TooltipContent>
+        </Tooltip>
       )}
 
       <div className="flex items-center justify-between gap-2 min-w-0">
