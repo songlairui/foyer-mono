@@ -4,7 +4,6 @@ import { orpc } from "#/orpc/client";
 import { Badge } from "#/components/ui/badge";
 import { Input } from "#/components/ui/input";
 import { Button } from "#/components/ui/button";
-import { ScrollArea } from "#/components/ui/scroll-area";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,8 +18,6 @@ import {
 import { toast } from "sonner";
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import {
-  FolderOpen,
-  Search,
   FolderSearch,
   Star,
   Briefcase,
@@ -32,11 +29,13 @@ import {
   RefreshCw,
   Maximize,
   Minimize,
+  Search,
+  FolderOpen,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({ component: HomePage });
 
-// ── Types ───────────────────────────────────────────────────────────────────
+// ── Types ────────────────────────────────────────────────────────────────────
 
 interface Repo {
   repo: string;
@@ -55,12 +54,7 @@ interface RepoTag {
   workDir?: string;
 }
 
-type SidebarFilter =
-  | { type: "unclassified" }
-  | { type: "category"; category: Category; workDir?: string }
-  | { type: "scan-root"; path: string };
-
-// ── Storage ─────────────────────────────────────────────────────────────────
+// ── Storage ──────────────────────────────────────────────────────────────────
 
 const CAT_PREFIX = "foyer.repo.cat.";
 const CLICK_PREFIX = "foyer.repo.click.";
@@ -78,7 +72,7 @@ function readAllTags(): Record<string, RepoTag> {
       try {
         result[path] = JSON.parse(raw) as RepoTag;
       } catch {
-        /* skip malformed */
+        /* skip */
       }
     }
   } catch {}
@@ -97,102 +91,64 @@ function readWorkDirs(): string[] {
     return ["方向A", "方向B"];
   }
 }
-
 function writeWorkDirs(dirs: string[]) {
   localStorage.setItem(WORK_DIRS_KEY, JSON.stringify(dirs));
 }
 
-function getClickCount(path: string): number {
+function getClickCount(path: string) {
   try {
     return parseInt(localStorage.getItem(CLICK_PREFIX + path) ?? "0", 10) || 0;
   } catch {
     return 0;
   }
 }
-
-function incClickCount(path: string): number {
-  const next = getClickCount(path) + 1;
+function incClickCount(path: string) {
+  const n = getClickCount(path) + 1;
   try {
-    localStorage.setItem(CLICK_PREFIX + path, String(next));
+    localStorage.setItem(CLICK_PREFIX + path, String(n));
   } catch {}
-  return next;
+  return n;
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function relativeTime(ms: number): string {
   if (!ms) return "";
-  const diff = Date.now() - ms;
-  if (diff < 60_000) return "刚刚";
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m`;
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h`;
-  if (diff < 7 * 86_400_000) return `${Math.floor(diff / 86_400_000)}d`;
+  const d = Date.now() - ms;
+  if (d < 60_000) return "刚刚";
+  if (d < 3_600_000) return `${Math.floor(d / 60_000)}m`;
+  if (d < 86_400_000) return `${Math.floor(d / 3_600_000)}h`;
+  if (d < 7 * 86_400_000) return `${Math.floor(d / 86_400_000)}d`;
   return new Date(ms).toLocaleDateString("zh-CN", { month: "short", day: "numeric" });
 }
 
-const CATEGORY_META: Record<Category, { icon: React.ReactNode; label: string }> = {
-  goal: { icon: <Star className="h-3.5 w-3.5" />, label: "Goal" },
-  work: { icon: <Briefcase className="h-3.5 w-3.5" />, label: "工作" },
-  life: { icon: <Home className="h-3.5 w-3.5" />, label: "生活" },
-  explore: { icon: <Compass className="h-3.5 w-3.5" />, label: "探索" },
+const CAT_META: Record<Category, { icon: React.ReactNode; label: string; color: string }> = {
+  goal: { icon: <Star className="h-3 w-3" />, label: "Goal", color: "text-amber-400" },
+  work: { icon: <Briefcase className="h-3 w-3" />, label: "工作", color: "text-blue-400" },
+  life: { icon: <Home className="h-3 w-3" />, label: "生活", color: "text-emerald-400" },
+  explore: { icon: <Compass className="h-3 w-3" />, label: "探索", color: "text-purple-400" },
 };
-
-// ── AgentStatusDot ────────────────────────────────────────────────────────────
-
-function AgentStatusDot({
-  online,
-  opener,
-}: {
-  online: boolean | undefined;
-  opener?: string | null;
-}) {
-  if (online === undefined)
-    return (
-      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Circle className="h-2 w-2 fill-muted-foreground animate-pulse" />
-        检查中…
-      </span>
-    );
-  return (
-    <span
-      className={`flex items-center gap-1.5 text-xs ${online ? "text-green-500" : "text-muted-foreground"}`}
-    >
-      <span
-        className={`h-2 w-2 rounded-full ${online ? "bg-green-500 shadow-[0_0_6px_2px_rgba(34,197,94,0.5)]" : "bg-muted-foreground"}`}
-      />
-      {online ? `agent · ${opener ?? ""}` : "agent 未启动"}
-    </span>
-  );
-}
 
 // ── FullscreenButton ──────────────────────────────────────────────────────────
 
 function FullscreenButton() {
-  const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
-
+  const [full, setFull] = useState(!!document.fullscreenElement);
   useEffect(() => {
-    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener("fullscreenchange", onChange);
-    return () => document.removeEventListener("fullscreenchange", onChange);
+    const cb = () => setFull(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", cb);
+    return () => document.removeEventListener("fullscreenchange", cb);
   }, []);
-
-  const toggle = () => {
-    if (document.fullscreenElement) {
-      void document.exitFullscreen();
-    } else {
-      void document.documentElement.requestFullscreen();
-    }
-  };
-
   return (
     <Button
       size="sm"
       variant="ghost"
-      className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-      onClick={toggle}
-      title={isFullscreen ? "退出全屏" : "全屏"}
+      className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+      onClick={() =>
+        full ? void document.exitFullscreen() : void document.documentElement.requestFullscreen()
+      }
+      title={full ? "退出全屏" : "全屏"}
     >
-      {isFullscreen ? <Minimize className="h-3.5 w-3.5" /> : <Maximize className="h-3.5 w-3.5" />}
+      {full ? <Minimize className="h-3.5 w-3.5" /> : <Maximize className="h-3.5 w-3.5" />}
     </Button>
   );
 }
@@ -201,12 +157,13 @@ function FullscreenButton() {
 
 interface RepoCardProps {
   repo: Repo;
-  tag: RepoTag | undefined;
+  tag?: RepoTag;
   workDirs: string[];
   agentOnline: boolean;
   onOpen: (path: string) => Promise<void>;
   onTag: (path: string, tag: RepoTag | null) => void;
   onAddWorkDir: (dir: string) => void;
+  cardRef?: (el: HTMLDivElement | null) => void;
 }
 
 function RepoCard({
@@ -217,53 +174,52 @@ function RepoCard({
   onOpen,
   onTag,
   onAddWorkDir,
+  cardRef,
 }: RepoCardProps) {
   const [loading, setLoading] = useState(false);
   const [clicks, setClicks] = useState(() => getClickCount(repo.path));
+  const parts = repo.path.split("/");
+  const displayPath = parts.length > 4 ? "…/" + parts.slice(-3).join("/") : repo.path;
 
   const handleOpen = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (loading) return;
-    if (!agentOnline) {
-      toast.error("agent 未启动 · foyer agent start");
+    if (loading || !agentOnline) {
+      if (!agentOnline) toast.error("agent 未启动 · foyer agent start");
       return;
     }
     setLoading(true);
     try {
       await onOpen(repo.path);
-      const next = incClickCount(repo.path);
-      setClicks(next);
+      setClicks(incClickCount(repo.path));
     } finally {
       setLoading(false);
     }
   };
 
-  const parts = repo.path.split("/");
-  const displayPath = parts.length > 4 ? "…/" + parts.slice(-3).join("/") : repo.path;
-
   return (
-    <div className="group relative flex flex-col gap-1.5 rounded-xl border bg-card px-4 pt-3 pb-2.5 transition-colors hover:border-border/80 hover:bg-accent/10">
-      {/* Title + tag indicator */}
+    <div
+      ref={cardRef}
+      data-repo-path={repo.path}
+      className="flex flex-col gap-1.5 rounded-xl border bg-card px-4 pt-3 pb-2.5 transition-colors hover:border-border/80 hover:bg-accent/10"
+    >
       <div className="flex items-start justify-between gap-2">
         <span className="font-mono text-sm font-semibold leading-tight break-all">{repo.repo}</span>
         {tag && (
-          <span className="shrink-0 flex items-center gap-1 text-[10px] text-muted-foreground">
-            {CATEGORY_META[tag.category].icon}
-            {tag.category === "work" && tag.workDir
-              ? tag.workDir
-              : CATEGORY_META[tag.category].label}
+          <span
+            className={`shrink-0 flex items-center gap-1 text-[10px] ${CAT_META[tag.category].color}`}
+          >
+            {CAT_META[tag.category].icon}
+            {tag.category === "work" && tag.workDir ? tag.workDir : CAT_META[tag.category].label}
           </span>
         )}
       </div>
 
-      {/* Description */}
       {repo.description && (
         <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
           {repo.description}
         </p>
       )}
 
-      {/* Path + mtime */}
       <div className="flex items-center justify-between gap-2 min-w-0">
         <span className="text-[11px] text-muted-foreground/60 truncate font-mono">
           {displayPath}
@@ -275,7 +231,6 @@ function RepoCard({
         ) : null}
       </div>
 
-      {/* Actions */}
       <div className="flex items-center gap-1 pt-1 border-t border-border/30">
         {clicks > 0 && (
           <span className="text-[10px] text-muted-foreground/40 mr-auto">{clicks}×</span>
@@ -291,7 +246,6 @@ function RepoCard({
             <ExternalLink className="h-3 w-3" />
             打开
           </Button>
-
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -369,40 +323,32 @@ function RepoCard({
 function HomePage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<SidebarFilter>({ type: "unclassified" });
   const searchRef = useRef<HTMLInputElement>(null);
   const inFlight = useRef<Set<string>>(new Set());
+  const mainScrollRef = useRef<HTMLDivElement>(null);
+  const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
+
   const [tags, setTagsState] = useState<Record<string, RepoTag>>(readAllTags);
   const [workDirs, setWorkDirsState] = useState<string[]>(readWorkDirs);
 
-  // devices data — cached for 5 min, manual refetch via button
-  const devicesQueryKey = orpc.devices.list.queryOptions().queryKey;
+  const devicesQueryOptions = orpc.devices.list.queryOptions();
   const {
     data: devicesData = [],
     isLoading: devicesLoading,
     isFetching,
     dataUpdatedAt,
-  } = useQuery({
-    ...orpc.devices.list.queryOptions(),
-    staleTime: 5 * 60_000,
-    gcTime: 10 * 60_000,
-  });
-
-  const handleForceRefresh = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: devicesQueryKey });
-  }, [queryClient, devicesQueryKey]);
+  } = useQuery({ ...devicesQueryOptions, staleTime: 5 * 60_000, gcTime: 10 * 60_000 });
 
   const { data: agentStatus, refetch: recheckAgent } = useQuery({
     ...orpc.agent.health.queryOptions(),
     refetchInterval: 10_000,
     staleTime: 8_000,
   });
-
   const openMutation = useMutation(orpc.agent.open.mutationOptions());
 
   const allRepos = useMemo(() => devicesData.flatMap((r) => r.repos), [devicesData]);
 
-  // Keyboard shortcuts
+  // keyboard shortcuts
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "/" && document.activeElement !== searchRef.current) {
@@ -431,8 +377,7 @@ function HomePage() {
         await openMutation.mutateAsync({ path });
         toast.success(`↗ ${repo?.repo ?? path}`);
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "打开失败";
-        toast.error(msg);
+        toast.error(e instanceof Error ? e.message : "打开失败");
         void recheckAgent();
       } finally {
         inFlight.current.delete(path);
@@ -448,249 +393,223 @@ function HomePage() {
 
   const handleAddWorkDir = useCallback((dir: string) => {
     setWorkDirsState((prev) => {
-      const next = prev.includes(dir) ? prev : [...prev, dir];
-      writeWorkDirs(next);
-      return next;
+      const n = prev.includes(dir) ? prev : [...prev, dir];
+      writeWorkDirs(n);
+      return n;
     });
   }, []);
 
-  // Category counts
-  const { catCounts, workDirCounts } = useMemo(() => {
-    const catCounts = { goal: 0, work: 0, life: 0, explore: 0 } as Record<Category, number>;
-    const workDirCounts: Record<string, number> = {};
-    for (const tag of Object.values(tags)) {
-      catCounts[tag.category]++;
-      if (tag.category === "work" && tag.workDir) {
-        workDirCounts[tag.workDir] = (workDirCounts[tag.workDir] ?? 0) + 1;
+  // Filtered repos for right panel (search only, no category filter)
+  const filteredGroups = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return devicesData
+      .map((root) => ({
+        ...root,
+        repos: q
+          ? root.repos.filter(
+              (r) =>
+                r.repo.toLowerCase().includes(q) ||
+                r.path.toLowerCase().includes(q) ||
+                (r.description?.toLowerCase().includes(q) ?? false),
+            )
+          : root.repos,
+      }))
+      .filter((r) => r.repos.length > 0);
+  }, [devicesData, search]);
+
+  // Left column: categorized repos grouped
+  const leftGroups = useMemo(() => {
+    const result: Array<{ category: Category; workDir?: string; repos: Repo[] }> = [];
+    const catGroups = new Map<string, Repo[]>();
+    for (const [path, tag] of Object.entries(tags)) {
+      const repo = allRepos.find((r) => r.path === path);
+      if (!repo) continue;
+      const key = tag.category === "work" && tag.workDir ? `work::${tag.workDir}` : tag.category;
+      const list = catGroups.get(key) ?? [];
+      list.push(repo);
+      catGroups.set(key, list);
+    }
+    for (const cat of ["goal", "work", "life", "explore"] as Category[]) {
+      const plain = catGroups.get(cat);
+      if (plain?.length) result.push({ category: cat, repos: plain });
+      // work sub-dirs
+      if (cat === "work") {
+        for (const dir of workDirs) {
+          const sub = catGroups.get(`work::${dir}`);
+          if (sub?.length) result.push({ category: "work", workDir: dir, repos: sub });
+        }
       }
     }
-    return { catCounts, workDirCounts };
-  }, [tags]);
+    return result;
+  }, [tags, allRepos, workDirs]);
 
-  const unclassifiedCount = allRepos.filter((r) => !tags[r.path]).length;
-
-  // Filter + search
-  const filteredRepos = useMemo(() => {
-    let repos = allRepos;
-    if (filter.type === "unclassified") {
-      repos = repos.filter((r) => !tags[r.path]);
-    } else if (filter.type === "category") {
-      repos = repos.filter((r) => {
-        const tag = tags[r.path];
-        if (!tag || tag.category !== filter.category) return false;
-        if (filter.workDir) return tag.workDir === filter.workDir;
-        return true;
-      });
-    } else if (filter.type === "scan-root") {
-      repos = repos.filter((r) => r.scanRoot === filter.path);
-    }
-    const q = search.trim().toLowerCase();
-    if (q) {
-      repos = repos.filter(
-        (r) =>
-          r.repo.toLowerCase().includes(q) ||
-          r.path.toLowerCase().includes(q) ||
-          (r.description?.toLowerCase().includes(q) ?? false),
-      );
-    }
-    return repos;
-  }, [allRepos, filter, tags, search]);
-
-  // Group by scanRoot for scan-root / unclassified views
-  const groupedRepos = useMemo(() => {
-    if (filter.type === "category") {
-      return [{ groupKey: "", title: "", repos: filteredRepos }];
-    }
-    const byRoot = new Map<string, Repo[]>();
-    for (const r of filteredRepos) {
-      const list = byRoot.get(r.scanRoot) ?? [];
-      list.push(r);
-      byRoot.set(r.scanRoot, list);
-    }
-    return Array.from(byRoot.entries()).map(([path, repos]) => ({
-      groupKey: path,
-      title: path.replace(/^\/Users\/[^/]+/, "~"),
-      repos,
-    }));
-  }, [filter, filteredRepos]);
-
-  const isActive = (f: SidebarFilter) => JSON.stringify(filter) === JSON.stringify(f);
-  const navCls = (active: boolean) =>
-    `w-full flex items-center justify-between rounded-lg px-2 py-1.5 text-left text-xs transition-colors hover:bg-accent cursor-pointer ${active ? "bg-accent text-accent-foreground font-medium" : "text-muted-foreground"}`;
+  const scrollToSection = (path: string) => {
+    const section = sectionRefs.current[path];
+    const container = mainScrollRef.current;
+    if (!section || !container) return;
+    const offset =
+      section.getBoundingClientRect().top -
+      container.getBoundingClientRect().top +
+      container.scrollTop -
+      8;
+    container.scrollTo({ top: offset, behavior: "smooth" });
+  };
 
   const cacheAge = dataUpdatedAt ? Math.floor((Date.now() - dataUpdatedAt) / 60_000) : null;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background text-foreground">
-      {/* ── Sidebar ── */}
-      <nav className="flex w-56 shrink-0 flex-col border-r">
-        <div className="flex items-center gap-2 px-3 py-3 border-b">
+    <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
+      {/* ── Header ── */}
+      <header className="flex items-center gap-3 border-b px-5 py-2.5 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           <FolderSearch className="h-4 w-4 text-primary" />
           <span className="text-sm font-semibold">Foyer</span>
-          <Badge variant="outline" className="ml-auto text-[10px] px-1.5">
+          <Badge variant="outline" className="text-[10px] px-1.5">
             {allRepos.length}
           </Badge>
         </div>
 
-        <ScrollArea className="flex-1">
-          <div className="p-2 space-y-0.5">
-            {/* Tagged categories */}
-            {(["goal", "work", "life", "explore"] as Category[]).map((cat) => {
-              const count = catCounts[cat];
-              return (
-                <div key={cat}>
-                  <button
-                    className={navCls(
-                      filter.type === "category" && filter.category === cat && !filter.workDir,
-                    )}
-                    onClick={() => setFilter({ type: "category", category: cat })}
-                  >
-                    <span className="flex items-center gap-1.5">
-                      {CATEGORY_META[cat].icon}
-                      {CATEGORY_META[cat].label}
-                    </span>
-                    {count > 0 && (
-                      <Badge variant="secondary" className="text-[10px] px-1.5">
-                        {count}
-                      </Badge>
-                    )}
-                  </button>
-                  {/* Work sub-dirs */}
-                  {cat === "work" &&
-                    workDirs
-                      .filter((d) => (workDirCounts[d] ?? 0) > 0)
-                      .map((dir) => (
-                        <button
-                          key={dir}
-                          className={
-                            navCls(
-                              filter.type === "category" &&
-                                filter.category === "work" &&
-                                filter.workDir === dir,
-                            ) + " pl-7"
-                          }
-                          onClick={() =>
-                            setFilter({ type: "category", category: "work", workDir: dir })
-                          }
-                        >
-                          <span className="truncate">{dir}</span>
-                          <Badge variant="secondary" className="text-[10px] px-1.5">
-                            {workDirCounts[dir] ?? 0}
-                          </Badge>
-                        </button>
-                      ))}
-                </div>
-              );
-            })}
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+          <Input
+            ref={searchRef}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="搜索 repo… ( / )"
+            className="pl-8 h-8 text-xs"
+          />
+        </div>
 
-            {/* Scan Roots */}
-            <div className="pt-3">
-              <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground px-2 pb-1.5">
-                Scan Roots
-              </div>
-              {devicesData.map((root) => (
-                <button
-                  key={root.path}
-                  className={navCls(filter.type === "scan-root" && filter.path === root.path)}
-                  onClick={() => setFilter({ type: "scan-root", path: root.path })}
-                >
-                  <span className="truncate font-mono">
-                    {root.path.replace(/^\/Users\/[^/]+/, "~")}
-                  </span>
-                  <Badge variant="secondary" className="shrink-0 text-[10px] px-1.5">
-                    {root.repos.length}
-                  </Badge>
-                </button>
-              ))}
-            </div>
-
-            {/* Unclassified (default) */}
-            <button
-              className={navCls(isActive({ type: "unclassified" }))}
-              onClick={() => setFilter({ type: "unclassified" })}
+        <div className="ml-auto flex items-center gap-2">
+          {/* Agent status */}
+          {agentStatus === undefined ? (
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Circle className="h-2 w-2 fill-muted-foreground animate-pulse" />
+              检查中…
+            </span>
+          ) : (
+            <span
+              className={`flex items-center gap-1.5 text-xs ${agentStatus.online ? "text-green-500" : "text-muted-foreground"}`}
             >
-              <span className="flex items-center gap-1.5">
-                <FolderOpen className="h-3.5 w-3.5" />
-                未分类
-              </span>
-              <Badge variant="secondary" className="text-[10px] px-1.5">
-                {unclassifiedCount}
-              </Badge>
-            </button>
-          </div>
-        </ScrollArea>
-
-        {/* Agent status + fullscreen */}
-        <div className="border-t px-3 py-2 flex items-center justify-between">
-          <AgentStatusDot online={agentStatus?.online} opener={agentStatus?.opener} />
+              <span
+                className={`h-2 w-2 rounded-full ${agentStatus.online ? "bg-green-500 shadow-[0_0_6px_2px_rgba(34,197,94,0.5)]" : "bg-muted-foreground"}`}
+              />
+              {agentStatus.online ? `agent · ${agentStatus.opener ?? ""}` : "agent 未启动"}
+            </span>
+          )}
+          {cacheAge !== null && (
+            <span className="text-[11px] text-muted-foreground/50">
+              {cacheAge === 0 ? "刚更新" : `${cacheAge}m 前`}
+            </span>
+          )}
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
+            onClick={() =>
+              void queryClient.invalidateQueries({ queryKey: devicesQueryOptions.queryKey })
+            }
+            disabled={isFetching}
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
+            刷新
+          </Button>
           <FullscreenButton />
         </div>
-      </nav>
+      </header>
 
-      {/* ── Main ── */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Header */}
-        <header className="flex items-center gap-3 border-b px-5 py-2">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-            <Input
-              ref={searchRef}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="搜索 repo… ( / )"
-              className="pl-8 h-8 text-xs"
-            />
+      {/* ── Body ── */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* ── Left column: categorized repos ── */}
+        <aside className="w-52 shrink-0 border-r overflow-y-auto py-3">
+          {leftGroups.length === 0 ? (
+            <div className="px-4 py-6 text-center text-xs text-muted-foreground/50">
+              <p>暂无标记</p>
+              <p className="mt-1">点击卡片 ⋯ 标记项目</p>
+            </div>
+          ) : (
+            leftGroups.map((group, i) => {
+              const meta = CAT_META[group.category];
+              const label = group.workDir ?? meta.label;
+              return (
+                <div key={i} className="mb-3">
+                  <div
+                    className={`flex items-center gap-1.5 px-4 pb-1.5 text-[11px] font-semibold uppercase tracking-wide ${meta.color}`}
+                  >
+                    {meta.icon}
+                    {label}
+                    <span className="ml-auto font-normal opacity-60">{group.repos.length}</span>
+                  </div>
+                  {group.repos.map((repo) => (
+                    <button
+                      key={repo.path}
+                      className="w-full px-4 py-1 text-left text-xs font-mono text-muted-foreground hover:text-foreground hover:bg-accent transition-colors truncate"
+                      onClick={() => {
+                        const el = document.querySelector(
+                          `[data-repo-path="${CSS.escape(repo.path)}"]`,
+                        );
+                        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+                      }}
+                    >
+                      {repo.repo}
+                    </button>
+                  ))}
+                </div>
+              );
+            })
+          )}
+        </aside>
+
+        {/* ── Right: anchor tabs + scrollable grid ── */}
+        <div className="flex flex-1 flex-col overflow-hidden">
+          {/* Anchor tabs */}
+          <div className="flex items-center gap-1.5 px-5 py-2 border-b shrink-0 flex-wrap">
+            {devicesData.map((root) => (
+              <button
+                key={root.path}
+                onClick={() => scrollToSection(root.path)}
+                className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              >
+                <span className="font-mono">{root.path.replace(/^\/Users\/[^/]+/, "~")}</span>
+                <Badge variant="secondary" className="text-[10px] px-1 py-0">
+                  {root.repos.length}
+                </Badge>
+              </button>
+            ))}
           </div>
 
-          <div className="ml-auto flex items-center gap-2">
-            {cacheAge !== null && (
-              <span className="text-[11px] text-muted-foreground/50">
-                {cacheAge === 0 ? "刚刚更新" : `${cacheAge}m 前`}
-              </span>
-            )}
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 px-2 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
-              onClick={handleForceRefresh}
-              disabled={isFetching}
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
-              刷新
-            </Button>
-          </div>
-        </header>
-
-        {/* Content */}
-        <ScrollArea className="flex-1">
-          <main className="px-6 py-4 space-y-8">
+          {/* Scrollable grid */}
+          <div ref={mainScrollRef} className="flex-1 overflow-y-auto px-6 py-4 space-y-10">
             {devicesLoading && (
               <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">
                 加载中…
               </div>
             )}
 
-            {!devicesLoading && filteredRepos.length === 0 && (
+            {!devicesLoading && filteredGroups.length === 0 && (
               <div className="flex flex-col items-center justify-center h-40 gap-2 text-muted-foreground">
                 <FolderOpen className="h-8 w-8 opacity-30" />
-                <span className="text-sm">{search ? "无匹配结果" : "暂无项目"}</span>
+                <span className="text-sm">{search ? "无匹配结果" : "未找到 repo"}</span>
               </div>
             )}
 
-            {groupedRepos.map((group) => (
-              <section key={group.groupKey || "all"}>
-                {group.title && (
-                  <div className="mb-3 flex items-center gap-2">
-                    <h2 className="font-mono text-xs font-semibold text-muted-foreground">
-                      {group.title}
-                    </h2>
-                    <Badge variant="secondary" className="text-[10px] px-1.5">
-                      {group.repos.length}
-                    </Badge>
-                  </div>
-                )}
+            {filteredGroups.map((root) => (
+              <section
+                key={root.path}
+                ref={(el) => {
+                  sectionRefs.current[root.path] = el;
+                }}
+              >
+                <div className="mb-3 flex items-center gap-2">
+                  <h2 className="font-mono text-xs font-semibold text-muted-foreground">
+                    {root.path.replace(/^\/Users\/[^/]+/, "~")}
+                  </h2>
+                  <Badge variant="secondary" className="text-[10px] px-1.5">
+                    {root.repos.length}
+                  </Badge>
+                </div>
                 <div className="grid gap-2 grid-cols-[repeat(auto-fill,minmax(260px,1fr))]">
-                  {group.repos.map((repo) => (
+                  {root.repos.map((repo) => (
                     <RepoCard
                       key={repo.path}
                       repo={repo}
@@ -705,8 +624,8 @@ function HomePage() {
                 </div>
               </section>
             ))}
-          </main>
-        </ScrollArea>
+          </div>
+        </div>
       </div>
     </div>
   );
