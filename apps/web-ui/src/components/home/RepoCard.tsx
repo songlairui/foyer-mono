@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type HTMLAttributes } from "react";
 import { Button } from "#/components/ui/button";
 import {
   DropdownMenu,
@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Repo, RepoTag } from "./types";
-import { CAT_META, relativeTime } from "./utils";
+import { CAT_META, cn, relativeTime } from "./utils";
 import { getClickCount, incClickCount } from "./storage";
 
 interface RepoCardProps {
@@ -36,6 +36,7 @@ interface RepoCardProps {
   isDragging?: boolean;
   dragOverlay?: boolean;
   showDragHandle?: boolean;
+  dragHandleProps?: HTMLAttributes<HTMLDivElement>;
   cardRef?: (el: HTMLDivElement | null) => void;
 }
 
@@ -50,6 +51,7 @@ export function RepoCard({
   isDragging,
   dragOverlay,
   showDragHandle,
+  dragHandleProps,
   cardRef,
 }: RepoCardProps) {
   const [loading, setLoading] = useState(false);
@@ -86,7 +88,16 @@ export function RepoCard({
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-start gap-2 min-w-0">
           {showDragHandle && (
-            <GripVertical className="h-4 w-4 text-muted-foreground/40 shrink-0 mt-0.5 cursor-grab active:cursor-grabbing" />
+            <div
+              {...dragHandleProps}
+              aria-label={dragHandleProps?.["aria-label"] ?? "拖拽 repo"}
+              className={cn(
+                "flex h-5 w-5 shrink-0 items-center justify-center -ml-1 mt-0.5 rounded text-muted-foreground/45 cursor-grab touch-none select-none transition-colors hover:bg-accent hover:text-foreground active:cursor-grabbing",
+                dragHandleProps?.className,
+              )}
+            >
+              <GripVertical className="h-4 w-4" />
+            </div>
           )}
           <span className="font-mono text-sm font-semibold leading-tight break-all min-w-0">
             {repo.repo}

@@ -1,9 +1,8 @@
 import { ScrollArea } from "#/components/ui/scroll-area";
 import { Badge } from "#/components/ui/badge";
-import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { useDroppable } from "@dnd-kit/core";
 import type { Repo, RepoTag, Category } from "./types";
-import { SortableRepoCard } from "./SortableRepoCard";
+import { DraggableRepoCard } from "./DraggableRepoCard";
 import { CAT_META } from "./utils";
 
 interface CategoryPaneProps {
@@ -16,7 +15,6 @@ interface CategoryPaneProps {
   onOpen: (path: string) => Promise<void>;
   onTag: (path: string, tag: RepoTag | null) => void;
   onAddWorkDir: (dir: string) => void;
-  isOver?: boolean;
   id?: string;
 }
 
@@ -30,19 +28,21 @@ export function CategoryPane({
   onOpen,
   onTag,
   onAddWorkDir,
-  isOver,
   id,
 }: CategoryPaneProps) {
   const meta = CAT_META[category];
   const label = workDir ?? meta.label;
-  const ids = repos.map((r) => r.path);
-  const { setNodeRef, isOver: isCurrentlyOver } = useDroppable({ id: id || "" });
+  const paneId = id || "";
+  const { setNodeRef, isOver: isCurrentlyOver } = useDroppable({
+    id: paneId,
+    data: { type: "categoryPane", category, workDir, paneId },
+  });
 
   return (
     <div
       ref={setNodeRef}
-      className={`flex flex-col min-w-0 border rounded-xl p-4 transition-all flex-1 ${
-        isOver || isCurrentlyOver ? "border-ring/50 bg-ring/5" : "border-border/30 bg-card/30"
+      className={`flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border p-4 transition-all ${
+        isCurrentlyOver ? "border-ring/50 bg-ring/5" : "border-border/30 bg-card/30"
       }`}
     >
       <div className="flex items-center gap-2 mb-3 shrink-0">
@@ -55,29 +55,27 @@ export function CategoryPane({
         </Badge>
       </div>
 
-      <ScrollArea className="flex-1 min-h-0">
+      <ScrollArea className="min-h-0 flex-1">
         {repos.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-24 gap-1 text-muted-foreground/40 text-xs">
             <p>拖入项目</p>
           </div>
         ) : (
-          <SortableContext items={ids} strategy={verticalListSortingStrategy}>
-            <div className="space-y-2 pr-2">
-              {repos.map((repo) => (
-                <SortableRepoCard
-                  key={repo.path}
-                  id={repo.path}
-                  repo={repo}
-                  tag={tags[repo.path]}
-                  workDirs={workDirs}
-                  agentOnline={agentOnline}
-                  onOpen={onOpen}
-                  onTag={onTag}
-                  onAddWorkDir={onAddWorkDir}
-                />
-              ))}
-            </div>
-          </SortableContext>
+          <div className="grid gap-2 pr-2 grid-cols-[repeat(auto-fill,minmax(220px,1fr))]">
+            {repos.map((repo) => (
+              <DraggableRepoCard
+                key={repo.path}
+                source="category"
+                repo={repo}
+                tag={tags[repo.path]}
+                workDirs={workDirs}
+                agentOnline={agentOnline}
+                onOpen={onOpen}
+                onTag={onTag}
+                onAddWorkDir={onAddWorkDir}
+              />
+            ))}
+          </div>
         )}
       </ScrollArea>
     </div>
