@@ -4,7 +4,6 @@ import { orpc } from "#/orpc/client";
 import { Badge } from "#/components/ui/badge";
 import { Input } from "#/components/ui/input";
 import { Button } from "#/components/ui/button";
-import { ScrollArea } from "#/components/ui/scroll-area";
 import { toast } from "sonner";
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { FolderSearch, Circle, RefreshCw, Search, Tags } from "lucide-react";
@@ -12,7 +11,6 @@ import { FolderSearch, Circle, RefreshCw, Search, Tags } from "lucide-react";
 // Import our components
 import { FullscreenButton } from "#/components/home/FullscreenButton";
 import { CategoryPane } from "#/components/home/CategoryPane";
-import { RepoCard } from "#/components/home/RepoCard";
 import type { Repo, RepoTag, Category } from "#/components/home/types";
 import { readAllTags, writeTag, readWorkDirs, writeWorkDirs } from "#/components/home/storage";
 
@@ -23,8 +21,6 @@ function HomePage() {
   const [search, setSearch] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
   const inFlight = useRef<Set<string>>(new Set());
-  const mainScrollRef = useRef<HTMLDivElement>(null);
-  const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const [tags, setTagsState] = useState<Record<string, RepoTag>>(readAllTags);
   const [workDirs, setWorkDirsState] = useState<string[]>(readWorkDirs);
@@ -32,7 +28,6 @@ function HomePage() {
   const devicesQueryOptions = orpc.devices.list.queryOptions();
   const {
     data: devicesData = [],
-    isLoading: devicesLoading,
     isFetching,
     dataUpdatedAt,
   } = useQuery({ ...devicesQueryOptions, staleTime: 5 * 60_000, gcTime: 10 * 60_000 });
@@ -45,24 +40,6 @@ function HomePage() {
   const openMutation = useMutation(orpc.agent.open.mutationOptions());
 
   const allRepos = useMemo(() => devicesData.flatMap((r) => r.repos), [devicesData]);
-  const filteredDeviceGroups = useMemo(() => {
-    const q = search.trim().toLowerCase();
-
-    return devicesData
-      .map((root) => ({
-        ...root,
-        repos: root.repos.filter((repo) => {
-          if (!q) return true;
-
-          return (
-            repo.repo.toLowerCase().includes(q) ||
-            repo.path.toLowerCase().includes(q) ||
-            (repo.description?.toLowerCase().includes(q) ?? false)
-          );
-        }),
-      }))
-      .filter((root) => root.repos.length > 0);
-  }, [devicesData, search]);
 
   // keyboard shortcuts
   useEffect(() => {
@@ -119,9 +96,18 @@ function HomePage() {
   const leftGroups = useMemo(() => {
     const result: Array<{ category: Category; workDir?: string; repos: Repo[]; id: string }> = [];
     const catGroups = new Map<string, Repo[]>();
+    const q = search.trim().toLowerCase();
     for (const [path, tag] of Object.entries(tags)) {
       const repo = allRepos.find((r) => r.path === path);
       if (!repo) continue;
+      if (
+        q &&
+        !repo.repo.toLowerCase().includes(q) &&
+        !repo.path.toLowerCase().includes(q) &&
+        !(repo.description?.toLowerCase().includes(q) ?? false)
+      ) {
+        continue;
+      }
       const key = tag.category === "work" && tag.workDir ? `work::${tag.workDir}` : tag.category;
       const list = catGroups.get(key) ?? [];
       list.push(repo);
@@ -145,20 +131,7 @@ function HomePage() {
     result.push({ category: "explore", repos: catGroups.get("explore") ?? [], id: "pane-explore" });
 
     return result;
-  }, [tags, allRepos, workDirs]);
-
-  // Scroll to section on right side
-  const scrollToSection = (path: string) => {
-    const section = sectionRefs.current[path];
-    const container = mainScrollRef.current;
-    if (!section || !container) return;
-    const offset =
-      section.getBoundingClientRect().top -
-      container.getBoundingClientRect().top +
-      container.scrollTop -
-      8;
-    container.scrollTo({ top: offset, behavior: "smooth" });
-  };
+  }, [tags, allRepos, workDirs, search]);
 
   const cacheAge = dataUpdatedAt ? Math.floor((Date.now() - dataUpdatedAt) / 60_000) : null;
 
@@ -231,8 +204,7 @@ function HomePage() {
 
       {/* ── Body ── */}
       <div className="flex flex-1 overflow-hidden p-4 gap-4">
-        {/* ── Left: Category Panels (60%) ── */}
-        <div className="flex-3 flex min-h-0 min-w-0 flex-col gap-4 w-[60%]">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
           <div className="grid min-h-0 flex-1 grid-cols-2 auto-rows-fr gap-4 overflow-hidden">
             {leftGroups.map((group) => (
               <CategoryPane
@@ -250,81 +222,6 @@ function HomePage() {
               />
             ))}
           </div>
-        </div>
-
-        {/* ── Right: Repo List (40%) ── */}
-        <div className="flex-2 min-w-0 border border-border/30 rounded-xl bg-card/20 w-[40%] flex flex-col overflow-hidden">
-          {/* Anchor tabs */}
-          <div className="flex items-center gap-1.5 px-4 py-2 border-b border-border/30 shrink-0 flex-wrap">
-            {devicesData.map((root) => (
-              <Button
-                key={root.path}
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
-                onClick={() => scrollToSection(root.path)}
-              >
-                <span className="font-mono">{root.path.replace(/^\/Users\/[^/]+/, "~")}</span>
-                <Badge variant="secondary" className="text-[10px] px-1 py-0">
-                  {root.repos.length}
-                </Badge>
-              </Button>
-            ))}
-          </div>
-
-          {/* Scrollable grid */}
-          <ScrollArea viewportRef={mainScrollRef} className="flex-1 min-h-0">
-            <div className="p-4 space-y-8">
-              {devicesLoading && (
-                <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">
-                  加载中…
-                </div>
-              )}
-
-              {/* 显示过滤后的分组 */}
-              {(() => {
-                if (!devicesLoading && filteredDeviceGroups.length === 0) {
-                  return (
-                    <div className="flex flex-col items-center justify-center h-40 gap-2 text-muted-foreground">
-                      <span className="text-sm">{search ? "无匹配结果" : "未找到 repo"}</span>
-                    </div>
-                  );
-                }
-
-                return filteredDeviceGroups.map((root) => (
-                  <section
-                    key={root.path}
-                    ref={(el) => {
-                      sectionRefs.current[root.path] = el;
-                    }}
-                  >
-                    <div className="mb-3 flex items-center gap-2 sticky top-0 bg-card/90 backdrop-blur-md z-50 py-2">
-                      <h2 className="font-mono text-xs font-semibold text-muted-foreground">
-                        {root.path.replace(/^\/Users\/[^/]+/, "~")}
-                      </h2>
-                      <Badge variant="secondary" className="text-[10px] px-1.5">
-                        {root.repos.length}
-                      </Badge>
-                    </div>
-                    <div className="grid gap-2 grid-cols-[repeat(auto-fill,minmax(260px,1fr))]">
-                      {root.repos.map((repo) => (
-                        <RepoCard
-                          key={repo.path}
-                          repo={repo}
-                          tag={tags[repo.path]}
-                          workDirs={workDirs}
-                          agentOnline={agentStatus?.online ?? false}
-                          onOpen={handleOpen}
-                          onTag={handleTag}
-                          onAddWorkDir={handleAddWorkDir}
-                        />
-                      ))}
-                    </div>
-                  </section>
-                ));
-              })()}
-            </div>
-          </ScrollArea>
         </div>
       </div>
     </div>
