@@ -20,8 +20,9 @@ apps/web-ui 后续计划补齐 RepoCard 的仓库信息展示：
   <summary>原文</summary>
 
 apps/web-ui 未来计划功能：
+
 - repocard 的显示 - 对于 remote 是 github 的，支持client端 查询 repo 的 star（感觉很耗请求，可以做个中转缓存api）
 - repo 的worktree 信息支持一下。有 worktree 的显示个标记，再关联上各个worktree
- -- 未来支持 - 将同 repo 的多次 clone 副本转换为 worktree （待定）
+  -- 未来支持 - 将同 repo 的多次 clone 副本转换为 worktree （待定）
 
 </details>

@@ -1,6 +1,6 @@
 import { ScrollArea } from "#/components/ui/scroll-area";
 import { Badge } from "#/components/ui/badge";
-import type { Repo, RepoTag, Category } from "./types";
+import type { Repo, Category } from "./types";
 import { RepoCard } from "./RepoCard";
 import { CAT_META } from "./utils";
 
@@ -8,12 +8,8 @@ interface CategoryPaneProps {
   category: Category;
   workDir?: string;
   repos: Repo[];
-  tags: Record<string, RepoTag>;
-  workDirs: string[];
   agentOnline: boolean;
   onOpen: (path: string) => Promise<void>;
-  onTag: (path: string, tag: RepoTag | null) => void;
-  onAddWorkDir: (dir: string) => void;
   id?: string;
 }
 
@@ -21,12 +17,8 @@ export function CategoryPane({
   category,
   workDir,
   repos,
-  tags,
-  workDirs,
   agentOnline,
   onOpen,
-  onTag,
-  onAddWorkDir,
   id,
 }: CategoryPaneProps) {
   const meta = CAT_META[category];
@@ -55,16 +47,7 @@ export function CategoryPane({
         ) : (
           <div className="grid gap-2 pr-2 grid-cols-[repeat(auto-fill,minmax(220px,1fr))]">
             {repos.map((repo) => (
-              <RepoCard
-                key={repo.path}
-                repo={repo}
-                tag={tags[repo.path]}
-                workDirs={workDirs}
-                agentOnline={agentOnline}
-                onOpen={onOpen}
-                onTag={onTag}
-                onAddWorkDir={onAddWorkDir}
-              />
+              <RepoCard key={repo.path} repo={repo} agentOnline={agentOnline} onOpen={onOpen} />
             ))}
           </div>
         )}

@@ -12,7 +12,7 @@ import { FolderSearch, Circle, RefreshCw, Search, Tags } from "lucide-react";
 import { FullscreenButton } from "#/components/home/FullscreenButton";
 import { CategoryPane } from "#/components/home/CategoryPane";
 import type { Repo, RepoTag, Category } from "#/components/home/types";
-import { readAllTags, writeTag, readWorkDirs, writeWorkDirs } from "#/components/home/storage";
+import { readAllTags, readWorkDirs } from "#/components/home/storage";
 
 export const Route = createFileRoute("/")({ component: HomePage });
 
@@ -22,8 +22,8 @@ function HomePage() {
   const searchRef = useRef<HTMLInputElement>(null);
   const inFlight = useRef<Set<string>>(new Set());
 
-  const [tags, setTagsState] = useState<Record<string, RepoTag>>(readAllTags);
-  const [workDirs, setWorkDirsState] = useState<string[]>(readWorkDirs);
+  const [tags] = useState<Record<string, RepoTag>>(readAllTags);
+  const [workDirs] = useState<string[]>(readWorkDirs);
 
   const devicesQueryOptions = orpc.devices.list.queryOptions();
   const {
@@ -78,19 +78,6 @@ function HomePage() {
     },
     [agentStatus?.online, openMutation, allRepos, recheckAgent],
   );
-
-  const handleTag = useCallback((path: string, tag: RepoTag | null) => {
-    writeTag(path, tag);
-    setTagsState(readAllTags());
-  }, []);
-
-  const handleAddWorkDir = useCallback((dir: string) => {
-    setWorkDirsState((prev) => {
-      const n = prev.includes(dir) ? prev : [...prev, dir];
-      writeWorkDirs(n);
-      return n;
-    });
-  }, []);
 
   // Left panes grouped - 始终显示4个主分组，工作分组再显示子方向
   const leftGroups = useMemo(() => {
@@ -213,12 +200,8 @@ function HomePage() {
                 category={group.category}
                 workDir={group.workDir}
                 repos={group.repos}
-                tags={tags}
-                workDirs={workDirs}
                 agentOnline={agentStatus?.online ?? false}
                 onOpen={handleOpen}
-                onTag={handleTag}
-                onAddWorkDir={handleAddWorkDir}
               />
             ))}
           </div>

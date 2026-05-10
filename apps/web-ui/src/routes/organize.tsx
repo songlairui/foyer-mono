@@ -124,6 +124,7 @@ function RepoTileView({
   isDragging?: boolean;
   isSelected?: boolean;
 }) {
+  const subtitle = repo.description || compactPath(repo.path);
   return (
     <div
       className={`group flex min-w-0 items-center gap-2 rounded-lg border border-border/40 bg-card px-2.5 py-2 transition-colors ${
@@ -133,9 +134,7 @@ function RepoTileView({
       <GripVertical className="h-3.5 w-3.5 shrink-0 text-muted-foreground/45" />
       <div className="min-w-0 flex-1">
         <div className="truncate font-mono text-xs font-semibold">{repo.repo}</div>
-        <div className="truncate font-mono text-[10px] text-muted-foreground/55">
-          {compactPath(repo.path)}
-        </div>
+        <div className="truncate text-[10px] text-muted-foreground/55">{subtitle}</div>
       </div>
       {tag ? (
         <span className={`shrink-0 text-[10px] ${CAT_META[tag.category].color}`}>
