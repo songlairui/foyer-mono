@@ -1,6 +1,7 @@
 import { ScrollArea } from "#/components/ui/scroll-area";
 import { Badge } from "#/components/ui/badge";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { useDroppable } from "@dnd-kit/core";
 import type { Repo, RepoTag, Category } from "./types";
 import { SortableRepoCard } from "./SortableRepoCard";
 import { CAT_META } from "./utils";
@@ -35,12 +36,13 @@ export function CategoryPane({
   const meta = CAT_META[category];
   const label = workDir ?? meta.label;
   const ids = repos.map((r) => r.path);
+  const { setNodeRef, isOver: isCurrentlyOver } = useDroppable({ id: id || "" });
 
   return (
     <div
-      id={id}
+      ref={setNodeRef}
       className={`flex flex-col min-w-0 border rounded-xl p-4 transition-all flex-1 ${
-        isOver ? "border-ring/50 bg-ring/5" : "border-border/30 bg-card/30"
+        isOver || isCurrentlyOver ? "border-ring/50 bg-ring/5" : "border-border/30 bg-card/30"
       }`}
     >
       <div className="flex items-center gap-2 mb-3 shrink-0">
