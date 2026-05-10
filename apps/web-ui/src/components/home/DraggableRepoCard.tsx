@@ -17,8 +17,13 @@ export function DraggableRepoCard({ id, ...props }: DraggableRepoCardProps) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id });
 
   return (
-    <div ref={setNodeRef} className="relative">
-      {/* 拖拽手柄层 - 但是用 pointer-events 来排除按钮区域 */}
+    <div
+      ref={setNodeRef}
+      className="relative select-none"
+      onMouseDown={(e) => e.preventDefault()}
+      onTouchStart={(e) => e.preventDefault()}
+    >
+      {/* 拖拽手柄层 */}
       <div
         className="absolute inset-0 z-10 cursor-grab active:cursor-grabbing"
         {...attributes}
