@@ -153,13 +153,16 @@ function runCommand(
   });
 }
 
+const MAX_SCAN_DEPTH = 10;
+
 async function listFilesRecursive(root: string): Promise<string[]> {
   const files: string[] = [];
-  const stack: string[] = [root];
+  const stack: Array<{ dir: string; depth: number }> = [{ dir: root, depth: 0 }];
   const visited = new Set<string>();
 
   while (stack.length > 0) {
-    const current = stack.pop()!;
+    const { dir: current, depth } = stack.pop()!;
+    if (depth > MAX_SCAN_DEPTH) continue;
 
     let real: string;
     try {
@@ -176,16 +179,22 @@ async function listFilesRecursive(root: string): Promise<string[]> {
     } catch {
       continue;
     }
+
+    // If this directory is a git repo, record it and stop descending.
+    // This prevents subdirectories of an already-matched project from
+    // being reported as separate repos.
+    const hasGit = entries.some((e) => e.isDirectory() && e.name === ".git");
+    if (hasGit) {
+      files.push(path.join(current, ".git"));
+      continue;
+    }
+
     for (const entry of entries) {
       if (entry.name === "node_modules") continue;
+      if (entry.name.startsWith(".")) continue;
       const fullPath = path.join(current, entry.name);
       if (entry.isDirectory()) {
-        if (entry.name === ".git") {
-          files.push(fullPath);
-          continue;
-        }
-        if (entry.name.startsWith(".")) continue;
-        stack.push(fullPath);
+        stack.push({ dir: fullPath, depth: depth + 1 });
       } else if (entry.isFile()) {
         files.push(fullPath);
       }
