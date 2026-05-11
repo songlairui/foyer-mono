@@ -1,4 +1,4 @@
-import { useState, type HTMLAttributes, useCallback } from "react";
+import { useState, type HTMLAttributes, useCallback, useRef } from "react";
 import { Button } from "#/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "#/components/ui/tooltip";
 import {
@@ -40,6 +40,8 @@ export function RepoCard({
   const [loading, setLoading] = useState(false);
   const [clicks, setClicks] = useState(() => getClickCount(repo.path));
   const [detailOpen, setDetailOpen] = useState(false);
+  const [sourceRect, setSourceRect] = useState<DOMRect | null>(null);
+  const cardElRef = useRef<HTMLDivElement | null>(null);
 
   const worktrees = repo.worktrees ?? [];
   const hasWorktrees = worktrees.length > 1;
@@ -78,14 +80,21 @@ export function RepoCard({
 
   const handleCardClick = useCallback(() => {
     if (!isDragging && !dragOverlay) {
-      setDetailOpen(true);
+      const rect = cardElRef.current?.getBoundingClientRect();
+      if (rect) {
+        setSourceRect(rect);
+        setDetailOpen(true);
+      }
     }
   }, [isDragging, dragOverlay]);
 
   return (
     <>
       <div
-        ref={cardRef}
+        ref={(el) => {
+          cardElRef.current = el;
+          if (cardRef) cardRef(el);
+        }}
         data-repo-path={repo.path}
         onClick={handleCardClick}
         className={`group flex flex-col gap-1 rounded-xl border bg-card transition-all hover:border-border/80 hover:bg-accent/10 cursor-pointer ${compact ? "px-3 py-1.5" : "px-4 pt-3 pb-2.5"} ${
@@ -165,9 +174,10 @@ export function RepoCard({
         )}
       </div>
 
-      {detailOpen && (
+      {detailOpen && sourceRect && (
         <RepoDetailModal
           repo={repo}
+          sourceRect={sourceRect}
           agentOnline={agentOnline}
           onOpen={handleOpenPath}
           onClose={() => setDetailOpen(false)}
