@@ -1,3 +1,4 @@
+import os from "node:os";
 import path from "node:path";
 import { Effect } from "effect";
 import { EntryWorkflowError } from "../domain/errors";
@@ -7,7 +8,7 @@ import {
   type RepoPrepareResult,
 } from "../domain/contracts";
 import { resolveConfig, projectPath } from "../domain/paths";
-import { FileSystem, Shell, type ShellService } from "../services/context";
+import { FileSystem, Shell, type FileSystemService, type ShellService } from "../services/context";
 import { listProjects } from "./project-init";
 
 export type RepoWorktree = {
@@ -147,20 +148,78 @@ function parseWorktreeList(stdout: string): RepoWorktree[] {
   return worktrees;
 }
 
+// ── Worktree cache ──────────────────────────────────────────────
+
+interface WorktreeCache {
+  worktrees: RepoWorktree[];
+  mtimeMs: number;
+}
+
+function worktreeCachePath(repoPath: string): string {
+  const safe = repoPath.replace(/[/\\]/g, "_").replace(/^_+/, "");
+  return path.join(os.homedir(), ".foyer", "worktrees", `${safe}.json`);
+}
+
+function readWorktreeCache(
+  fs: FileSystemService,
+  repoPath: string,
+): Effect.Effect<RepoWorktree[] | null, EntryWorkflowError> {
+  return Effect.gen(function* () {
+    const cacheFile = worktreeCachePath(repoPath);
+    if (!(yield* fs.exists(cacheFile))) return null;
+
+    const raw = yield* fs.readFile(cacheFile);
+    let cache: WorktreeCache;
+    try {
+      cache = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+
+    const gitDirStat = yield* fs.stat(path.join(repoPath, ".git"));
+    if (gitDirStat.mtimeMs > cache.mtimeMs) return null;
+
+    return cache.worktrees;
+  });
+}
+
+function writeWorktreeCache(
+  fs: FileSystemService,
+  repoPath: string,
+  worktrees: RepoWorktree[],
+): Effect.Effect<void, EntryWorkflowError> {
+  return Effect.gen(function* () {
+    const cacheFile = worktreeCachePath(repoPath);
+    const gitDirStat = yield* fs.stat(path.join(repoPath, ".git"));
+    const cache: WorktreeCache = {
+      worktrees,
+      mtimeMs: gitDirStat.mtimeMs,
+    };
+    yield* fs.writeFile(cacheFile, JSON.stringify(cache, null, 2) + "\n");
+  });
+}
+
 function enrichDevicesWithWorktrees<T extends RepoDevice>(
   devices: T[],
   shell: ShellService,
+  fs: FileSystemService,
+  force?: boolean,
 ): Effect.Effect<T[], EntryWorkflowError> {
   return Effect.forEach(
     devices,
     (device) =>
       Effect.gen(function* () {
+        if (!force) {
+          const cached = yield* readWorktreeCache(fs, device.path);
+          if (cached) return { ...device, worktrees: cached };
+        }
         const result = yield* shell.run("git", ["worktree", "list", "--porcelain"], {
           cwd: device.path,
           allowFailure: true,
         });
         if (result.exitCode !== 0) return device;
         const worktrees = parseWorktreeList(result.stdout);
+        yield* writeWorktreeCache(fs, device.path, worktrees);
         return worktrees.length > 0 ? { ...device, worktrees } : device;
       }),
     { concurrency: "unbounded" },
@@ -170,11 +229,13 @@ function enrichDevicesWithWorktrees<T extends RepoDevice>(
 export function repoDevicesWithWorktrees(input: {
   projectsRoot?: string;
   deviceName?: string;
+  force?: boolean;
 }): Effect.Effect<RepoDevicesResult, EntryWorkflowError, FileSystem | Shell> {
   return Effect.gen(function* () {
     const base = yield* repoDevices(input);
     const shell = yield* Shell;
-    const devices = yield* enrichDevicesWithWorktrees(base.devices, shell);
+    const fs = yield* FileSystem;
+    const devices = yield* enrichDevicesWithWorktrees(base.devices, shell, fs, input.force);
     const summary = devices.some((d) => d.worktrees && d.worktrees.length > 0)
       ? `共 ${devices.length} 个仓库（含 worktree）。`
       : base.humanSummaryZh;
@@ -185,11 +246,13 @@ export function repoDevicesWithWorktrees(input: {
 export function repoDevicesMultiWithWorktrees(input: {
   roots: string[];
   deviceName?: string;
+  force?: boolean;
 }): Effect.Effect<RepoDevicesMultiResult, EntryWorkflowError, FileSystem | Shell> {
   return Effect.gen(function* () {
     const base = yield* repoDevicesMulti(input);
     const shell = yield* Shell;
-    const devices = yield* enrichDevicesWithWorktrees(base.devices, shell);
+    const fs = yield* FileSystem;
+    const devices = yield* enrichDevicesWithWorktrees(base.devices, shell, fs, input.force);
     const summary = devices.some((d) => d.worktrees && d.worktrees.length > 0)
       ? `${input.roots.length} 个扫描根，共 ${devices.length} 个仓库（含 worktree）。`
       : base.humanSummaryZh;

@@ -180,12 +180,16 @@ async function listFilesRecursive(root: string): Promise<string[]> {
       continue;
     }
 
-    // If this directory is a git repo, record it and stop descending.
-    // This prevents subdirectories of an already-matched project from
-    // being reported as separate repos.
-    const hasGit = entries.some((e) => e.isDirectory() && e.name === ".git");
-    if (hasGit) {
-      files.push(path.join(current, ".git"));
+    // If this directory is a git repo (.git dir) or worktree (.git file),
+    // stop descending. For main repos we record the .git entry so the
+    // caller can discover the repo path; for worktrees we only short-circuit
+    // because worktrees are discovered via `git worktree list` from their
+    // main repo.
+    const gitEntry = entries.find((e) => e.name === ".git");
+    if (gitEntry) {
+      if (gitEntry.isDirectory()) {
+        files.push(path.join(current, ".git"));
+      }
       continue;
     }
 

@@ -321,15 +321,17 @@ repo
   .option("--projects-root <path>", "项目根目录（单根模式，不指定则用默认）")
   .option("--all-roots", "扫描所有已注册的根目录", false)
   .option("--with-worktrees", "检测每个仓库的 git worktree", false)
+  .option("--force", "强制重新扫描 worktree，忽略缓存", false)
   .option("--json", "输出稳定 JSON")
   .description("扫描当前设备上的项目仓库")
   .action(async (options) => {
     const withWorktrees = Boolean(options.withWorktrees);
+    const force = Boolean(options.force);
     if (options.allRoots) {
       if (withWorktrees) {
         await run(
           repoRootsList().pipe(
-            Effect.flatMap((r) => repoDevicesMultiWithWorktrees({ roots: r.roots })),
+            Effect.flatMap((r) => repoDevicesMultiWithWorktrees({ roots: r.roots, force })),
           ),
           options,
         );
@@ -341,7 +343,7 @@ repo
       }
     } else {
       if (withWorktrees) {
-        await run(repoDevicesWithWorktrees({ projectsRoot: options.projectsRoot }), options);
+        await run(repoDevicesWithWorktrees({ projectsRoot: options.projectsRoot, force }), options);
       } else {
         await run(repoDevices({ projectsRoot: options.projectsRoot }), options);
       }

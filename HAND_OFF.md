@@ -1,56 +1,56 @@
 # HAND_OFF
 
-> 生成时间：2026-05-10 21:30
+> 生成时间：2026-05-11 13:00
 
 ## 目标
 
-为 foyer 项目构建 Web UI Dashboard，展示 `foyer repo devices --all-roots --json` 返回的 repo 列表，支持分类标记、拖拽分组、美观的暗色主题，适配 3200x1350 宽屏。
+为 foyer 添加 git worktree 检测（CLI）与展示（Web UI），包括 repo 卡片点击后的抛物线飞行动画 + 3D 翻转卡片展示 worktree 列表。
 
 ## 当前状态
 
-拖拽功能存在两个 bug 未修复，已改了一半的代码未提交；右侧分组标题 sticky 和 ScrollArea 改动也未验证。
+CLI 侧已提交；Web UI 侧 3D flip 动画已修复根因（`transform-style: preserve-3d` 链条），但未在浏览器中验证。flying 动画用的是 Web Animations API，可能存在与 React 渲染的竞态。
 
 ## 已完成
 
-- 整体布局：60% 左侧分类面板 + 40% 右侧 repo 列表
-- 暗色主题、repo 描述、最后修改时间显示
-- 分类标记系统（Goal/Work/Life/Explore + 工作子方向）
-- 拖拽系统基础架构（dnd-kit: Draggable + Droppable + Sortable）
-- 路径显示从 ~/ 开始而非 /Users/...
-- 下拉菜单添加标记功能
-- DragOverlay 卡片样式
+- CLI: `foyer repo devices --with-worktrees` + `foyer repo worktrees --path` (commit `17cab89`)
+- CLI: `RepoWorktree` 类型、`git worktree list --porcelain` 解析、Effect 批量检测
+- Web UI: oRPC devices router 传 `--with-worktrees`、透传 worktree 数据
+- Web UI: RepoCard 上 GitBranch 图标 badge + DropdownMenu 快捷打开 worktree 分支
+- Web UI: RepoDetailModal 抛物线飞行（Web Animations API, 6 关键帧, 680ms）
+- Web UI: 3D flip 结构（perspective + preserve-3d + backface-visibility）
 
 ## 待完成
 
-- **右侧 repo 卡片无法拖拽** — 用户反馈拖拽不动，当前尝试将拖拽覆盖层从 `inset-0` 改为 `bottom-10`（只覆盖卡片上半部分），但未验证
-- **左侧拖拽触发右侧卡片拖拽** — 同一 repo 出现在左侧和右侧时 id 冲突，已添加 `sortable-` 前缀给左侧 SortableRepoCard，但未验证效果
-- **右侧分组标题 sticky** — 已改为 `sticky top-0 bg-card/90 backdrop-blur-md z-50`，但 sticky 在 ScrollArea 内可能不生效（ScrollArea 的 viewport 需要 `position: relative`）
-- **右侧滚动条样式** — 已将 `<div overflow-auto>` 改为 `<ScrollArea>`，需确认 ScrollArea 组件已正确引入 shadcn/ui
+- **在浏览器验证 3D flip 效果** — 已修复 `transform-style: preserve-3d` 在 `flyRef` 上缺失的问题，但未实际测试
+- 飞行结束后卡片宽度从 `sourceRect.width` 过渡到 `380px` 的动画可能需要调整
+- 飞行期间按 ESC 的行为未处理（phase === "fly-in" 时直接忽略）
 
 ## 关键决策
 
-- 同一 repo 左右两侧共享 `repo.path` 做拖拽 id → 导致 id 冲突 → 改为左侧 SortableRepoCard 使用 `sortable-${path}` 前缀
-- 拖拽覆盖层 `bottom-10` 而非 `inset-0` → 让底部按钮（"打开"、下拉菜单）可点击，但会影响底部区域拖拽
+- Worktree 检测走 Effect.Shell 而非 fs（`git worktree list --porcelain` 是唯一可靠方式）
+- 飞行动画用 Web Animations API 而非 CSS @keyframes：需要动态计算抛物线起止点（sx/sy → cx/cy），CSS keyframes 无法动态传参
+- 飞行结束后用 `commitStyles()` + `cancel()` 清除动画 fill，再显式写 inline style，避免动画样式（cascade layer 4）覆盖 CSS transition（layer 8）
+- 3D flip 需要完整 `preserve-3d` 链条：flyRef → inner div → front/back faces，缺任一环节 3D 渲染都会被压平为 2D
 
 ## 踩坑记录
 
-- SSR 场景下 `document` 不存在 → FullscreenButton 必须在 useEffect 内访问 document
-- 浏览器拖拽时触发文本选择 → 需要 `select-none` + `onMouseDown/onTouchStart preventDefault`
-- dnd-kit 的 useDraggable 与按钮点击冲突 → 拖拽层 z-10 覆盖了按钮 z-20，按钮不是被遮挡而是拖拽事件先被捕获
-- 同一 repo 左右两侧复用相同 id → DndContext 认为是同一个 draggable，拖左侧触发右侧的拖拽
-- ScrollArea 组件的 sticky 子元素需要 ScrollArea 的 viewport 有 `position: relative`，否则 sticky 不生效
+- 飞行动画 fill: "forwards" 在 cascade 中优先级高于普通 inline style，会导致后续 CSS transition 不生效 → 必须在 `onfinish` 中 cancel 动画并重写 style
+- `transition` 条件式设置（`flipped ? "transform ..." : "none"`）导致翻回去时 transition 先变 none 再变 transform，无动画 → 改为始终设置 transition
+- `perspective` 必须设在有 `preserve-3d` 的祖先元素上，否则透视无效，翻转只表现为 2D 缩放
 
 ## 下一步
 
-1. 修复右侧拖拽：验证 `bottom-10` 覆盖层方案是否可行，或改用 GripVertical 手柄作为唯一拖拽触发点
-2. 验证左侧 sortable 前缀是否解决了 id 冲突
-3. 验证 ScrollArea 内 sticky 标题是否生效，若不生效需给 ScrollArea 的 viewport 加 `position: relative`
-4. 提交这批修改（4 个文件）
+1. 在浏览器中打开 web-ui，点击一个 repo 卡片验证：
+   a. 抛物线飞行 + 360° Y 轴旋转是否流畅
+   b. 点击 Worktree 按钮，卡片是否以 3D 透视效果翻转到背面
+   c. 点击背面 ← 按钮，是否以 3D 效果翻回正面
+2. 如果 3D flip 仍然不工作：检查 `flyRef` 的 `perspective` / `transformStyle` 是否被 React 渲染覆盖
+3. 如果飞行结束后卡片位置偏移：检查 `anim.commitStyles()` 是否在 `cancel()` 之前执行
 
 ## 关键文件
 
-- `apps/web-ui/src/routes/index.tsx` — 主页面，DndContext + 布局 + 拖拽逻辑
-- `apps/web-ui/src/components/home/DraggableRepoCard.tsx` — 右侧可拖拽卡片，当前覆盖层改动未验证
-- `apps/web-ui/src/components/home/SortableRepoCard.tsx` — 左侧可排序卡片，sortable- 前缀改动未验证
-- `apps/web-ui/src/components/home/RepoCard.tsx` — 卡片 UI 组件
-- `apps/web-ui/src/components/home/CategoryPane.tsx` — 左侧分类面板，droppable 容器
+- `packages/cli/src/workflows/repo.ts` — worktree 检测核心（parseWorktreeList, enrichDevicesWithWorktrees, repoWorktreesByPath）
+- `packages/cli/src/cli/index.ts` — `--with-worktrees` flag + `repo worktrees` 命令
+- `apps/web-ui/src/components/home/RepoDetailModal.tsx` — 抛物线飞行 + 3D flip modal（约 420 行，核心动画逻辑在 40-110 行）
+- `apps/web-ui/src/components/home/RepoCard.tsx` — worktree 图标 badge + DropdownMenu + sourceRect 捕获
+- `apps/web-ui/src/orpc/router/devices.ts` — oRPC router，传 `--with-worktrees`
