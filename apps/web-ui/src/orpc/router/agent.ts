@@ -1,6 +1,6 @@
 import { os } from "@orpc/server";
 import { execFile } from "node:child_process";
-import { platform } from "node:os";
+import { writeFileSync } from "node:fs";
 import * as z from "zod";
 
 const AGENT_BASE = "http://127.0.0.1:7070";
@@ -47,6 +47,46 @@ export const revealRepo = os
     return { ok: true };
   });
 
+/**
+ * 写临时 shell 脚本再执行，避免中文/特殊字符经过
+ * AppleScript → Ghostty → shell 多层引用时丢失或乱码。
+ * 脚本路径只有安全 ASCII 字符，AppleScript 只传路径，不涉及输入内容。
+ */
+function openInGhostty(dir: string, rawInput: string) {
+  const shell = process.env.SHELL || "/bin/fish";
+  const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const tmpSh = `/tmp/pi-${stamp}.sh`;
+
+  // 嵌入到 shell 脚本中，只转义输入中的单引号
+  const quoted = rawInput.replace(/'/g, "'\\''");
+  writeFileSync(tmpSh, `#!/bin/sh\n${shell} -l -c 'pi ${quoted}'\nrm -f '${tmpSh}'\n`, {
+    mode: 0o755,
+  });
+
+  const asEsc = (s: string) => s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  const script = [
+    'tell application "Ghostty"',
+    "    set cfg to new surface configuration",
+    "    tell cfg",
+    `        set initial working directory to "${asEsc(dir)}"`,
+    `        set command to "${asEsc(tmpSh)}"`,
+    "        set wait after command to true",
+    "    end tell",
+    "    try",
+    "        set w to front window",
+    "        new tab in w with configuration cfg",
+    "    on error",
+    "        new window with configuration cfg",
+    "    end try",
+    "    activate",
+    "end tell",
+  ].join("\n");
+
+  execFile("osascript", ["-e", script], (err) => {
+    if (err) console.error("term open error:", err.message);
+  });
+}
+
 export const openTerm = os
   .input(
     z.object({
@@ -55,41 +95,6 @@ export const openTerm = os
     }),
   )
   .handler(({ input }) => {
-    const dir = input.dir ?? process.cwd();
-
-    if (platform() === "darwin") {
-      // AppleScript: 通过 stdin 传脚本（避免 -e 参数中的编码问题），中文不乱码
-      const asEsc = (s: string) => s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-      const safeCmd = input.cmd.replace(/'/g, "'\\''");
-      const shell = process.env.SHELL || "/bin/fish";
-      const shellCmd = `${shell} -l -c '${safeCmd}'`;
-      const script = [
-        'tell application "Ghostty"',
-        "    set cfg to new surface configuration",
-        "    tell cfg",
-        `        set initial working directory to "${asEsc(dir)}"`,
-        `        set command to "${asEsc(shellCmd)}"`,
-        "        set wait after command to true",
-        "    end tell",
-        "    try",
-        "        set w to front window",
-        "        new tab in w with configuration cfg",
-        "    on error",
-        "        new window with configuration cfg",
-        "    end try",
-        "    activate",
-        "end tell",
-      ].join("\n");
-      // 通过 stdin 传脚本，避免 -e 参数可能引发的编码问题
-      const proc = execFile("osascript", ["-"]);
-      proc.stdin!.write(script);
-      proc.stdin!.end();
-    } else {
-      const shell = process.env.SHELL || "/bin/sh";
-      const safeCmd = input.cmd.replace(/'/g, "'\\''");
-      execFile("ghostty", ["--working-directory=" + dir, "-e", shell, "-c", safeCmd], (err) => {
-        if (err) console.error("term open error:", err.message);
-      });
-    }
+    openInGhostty(input.dir ?? process.cwd(), input.cmd);
     return { ok: true };
   });
