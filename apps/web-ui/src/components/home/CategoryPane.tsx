@@ -1,12 +1,12 @@
 import { ScrollArea } from "#/components/ui/scroll-area";
 import { Badge } from "#/components/ui/badge";
-import type { Repo, Category } from "./types";
+import type { Repo, CategoryDef } from "./types";
 import { RepoCard } from "./RepoCard";
-import { CAT_META } from "./utils";
+import { getCatMeta } from "./utils";
 
 interface CategoryPaneProps {
-  category: Category;
-  workDir?: string;
+  category: CategoryDef;
+  subCategory?: string;
   repos: Repo[];
   agentOnline: boolean;
   onOpen: (path: string) => Promise<void>;
@@ -15,14 +15,14 @@ interface CategoryPaneProps {
 
 export function CategoryPane({
   category,
-  workDir,
+  subCategory,
   repos,
   agentOnline,
   onOpen,
   id,
 }: CategoryPaneProps) {
-  const meta = CAT_META[category];
-  const label = workDir ?? meta.label;
+  const meta = getCatMeta(category);
+  const label = subCategory ? `${meta.label}/${subCategory}` : meta.label;
 
   return (
     <div

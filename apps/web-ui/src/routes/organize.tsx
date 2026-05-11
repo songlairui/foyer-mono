@@ -13,7 +13,9 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { ArrowLeft, FolderSearch, GripVertical, Search, Settings, Tags } from "lucide-react";
+import { ArrowLeft, FolderSearch, Search, Settings, Tags } from "lucide-react";
+import * as CheckboxPrimitive from "@radix-ui/react-checkbox";
+import { cn } from "#/lib/utils";
 import {
   useCallback,
   useEffect,
@@ -21,15 +23,23 @@ import {
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
+  type ReactNode,
 } from "react";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
 import { Input } from "#/components/ui/input";
 import { ScrollArea } from "#/components/ui/scroll-area";
 import { orpc } from "#/orpc/client";
-import { readAllTags, readWorkDirs, writeTag, writeWorkDirs } from "#/components/home/storage";
-import type { Category, Repo, RepoTag } from "#/components/home/types";
-import { CAT_META } from "#/components/home/utils";
+import {
+  readAllTags,
+  readCategories,
+  readHiddenSubs,
+  writeCategories,
+  writeHiddenSubs,
+  writeTag,
+} from "#/components/home/storage";
+import type { CategoryDef, Repo, RepoTag } from "#/components/home/types";
+import { getCatMeta } from "#/components/home/utils";
 import { TagManageDialog } from "#/components/home/TagManageDialog";
 import { useChat } from "#/components/chat/ChatContext";
 
@@ -48,7 +58,7 @@ type DragData = {
 };
 
 type DropData =
-  | { type: "category"; category: Category; workDir?: string }
+  | { type: "category"; categoryId: string; subCategory?: string }
   | { type: "unclassified" };
 
 type MarqueeBox = {
@@ -83,7 +93,7 @@ function dragId(source: DragSource, path: string) {
 
 function sameTag(a: RepoTag | undefined, b: RepoTag | null) {
   if (!a || !b) return !a && !b;
-  return a.category === b.category && a.workDir === b.workDir;
+  return a.categoryId === b.categoryId && a.subCategory === b.subCategory;
 }
 
 function compactPath(path: string) {
@@ -120,10 +130,12 @@ function RepoTileView({
   repo,
   isDragging,
   isSelected,
+  prefix,
 }: {
   repo: Repo;
   isDragging?: boolean;
   isSelected?: boolean;
+  prefix?: ReactNode;
 }) {
   const subtitle = repo.description || compactPath(repo.path);
   return (
@@ -132,7 +144,7 @@ function RepoTileView({
         isDragging ? "opacity-35" : "hover:border-border/80 hover:bg-accent/10"
       } ${isSelected ? "border-ring/70 bg-ring/10 ring-1 ring-ring/40" : ""}`}
     >
-      <GripVertical className="h-3.5 w-3.5 shrink-0 text-muted-foreground/45" />
+      {prefix}
       <div className="min-w-0 flex-1">
         <div className="truncate font-mono text-xs font-semibold">{repo.repo}</div>
         <div className="truncate text-[10px] text-muted-foreground/55">{subtitle}</div>
@@ -145,13 +157,15 @@ function DraggableRepoTile({
   repo,
   source,
   isSelected,
-  onToggle,
+  onCardClick,
+  onCheckboxClick,
   registerTile,
 }: {
   repo: Repo;
   source: DragSource;
   isSelected: boolean;
-  onToggle: (path: string) => void;
+  onCardClick: (path: string) => void;
+  onCheckboxClick: (path: string) => void;
   registerTile: (path: string, source: DragSource, node: HTMLElement | null) => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -173,10 +187,48 @@ function DraggableRepoTile({
       data-repo-tile
       {...attributes}
       {...listeners}
-      onClick={() => onToggle(repo.path)}
+      onClick={() => onCardClick(repo.path)}
       className="touch-none cursor-grab active:cursor-grabbing"
     >
-      <RepoTileView repo={repo} isDragging={isDragging} isSelected={isSelected} />
+      <RepoTileView
+        repo={repo}
+        isDragging={isDragging}
+        isSelected={isSelected}
+        prefix={
+          <CheckboxPrimitive.Root
+            checked={isSelected}
+            onCheckedChange={() => onCheckboxClick(repo.path)}
+            onClick={(e) => e.stopPropagation()}
+            className="relative h-4 w-4 shrink-0 appearance-none bg-transparent p-0 border-0 outline-none cursor-pointer"
+          >
+            <div
+              className={cn(
+                "absolute inset-0 rounded-[3px] border transition-all",
+                isSelected ? "border-primary bg-primary" : "border-border/40 bg-transparent",
+              )}
+            />
+            <CheckboxPrimitive.Indicator
+              forceMount
+              className="absolute inset-0 flex items-center justify-center text-primary-foreground"
+            >
+              {isSelected && (
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2.5}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M6 12L10 16L18 8" />
+                </svg>
+              )}
+            </CheckboxPrimitive.Indicator>
+          </CheckboxPrimitive.Root>
+        }
+      />
     </div>
   );
 }
@@ -184,31 +236,33 @@ function DraggableRepoTile({
 function CategoryDropPane({
   id,
   category,
-  workDir,
+  subCategory,
   repos,
   selectedPaths,
-  onToggle,
+  onCardClick,
+  onCheckboxClick,
   registerTile,
   onMarqueeStart,
   onMarqueeMove,
   onMarqueeEnd,
 }: {
   id: string;
-  category: Category;
-  workDir?: string;
+  category: CategoryDef;
+  subCategory?: string;
   repos: Repo[];
   selectedPaths: Set<string>;
-  onToggle: (path: string) => void;
+  onCardClick: (path: string) => void;
+  onCheckboxClick: (path: string) => void;
   registerTile: (path: string, source: DragSource, node: HTMLElement | null) => void;
   onMarqueeStart: (event: ReactPointerEvent<HTMLElement>) => void;
   onMarqueeMove: (event: ReactPointerEvent<HTMLElement>) => void;
   onMarqueeEnd: (event: ReactPointerEvent<HTMLElement>) => void;
 }) {
-  const meta = CAT_META[category];
-  const label = workDir ?? meta.label;
+  const meta = getCatMeta(category);
+  const label = subCategory ? `${meta.label}/${subCategory}` : meta.label;
   const { setNodeRef, isOver } = useDroppable({
     id,
-    data: { type: "category", category, workDir } satisfies DropData,
+    data: { type: "category", categoryId: category.id, subCategory } satisfies DropData,
   });
 
   return (
@@ -245,7 +299,8 @@ function CategoryDropPane({
                 repo={repo}
                 source="category"
                 isSelected={selectedPaths.has(repo.path)}
-                onToggle={onToggle}
+                onCardClick={onCardClick}
+                onCheckboxClick={onCheckboxClick}
                 registerTile={registerTile}
               />
             ))}
@@ -260,7 +315,8 @@ function UnclassifiedPane({
   groups,
   count,
   selectedPaths,
-  onToggle,
+  onCardClick,
+  onCheckboxClick,
   registerTile,
   onMarqueeStart,
   onMarqueeMove,
@@ -269,7 +325,8 @@ function UnclassifiedPane({
   groups: RepoGroup[];
   count: number;
   selectedPaths: Set<string>;
-  onToggle: (path: string) => void;
+  onCardClick: (path: string) => void;
+  onCheckboxClick: (path: string) => void;
   registerTile: (path: string, source: DragSource, node: HTMLElement | null) => void;
   onMarqueeStart: (event: ReactPointerEvent<HTMLElement>) => void;
   onMarqueeMove: (event: ReactPointerEvent<HTMLElement>) => void;
@@ -316,7 +373,8 @@ function UnclassifiedPane({
                     repo={repo}
                     source="catalog"
                     isSelected={selectedPaths.has(repo.path)}
-                    onToggle={onToggle}
+                    onCardClick={onCardClick}
+                    onCheckboxClick={onCheckboxClick}
                     registerTile={registerTile}
                   />
                 ))}
@@ -371,18 +429,17 @@ function OrganizePage() {
   const [sortMode, setSortMode] = useState<SortMode>("modified-desc");
   const [activeDrag, setActiveDrag] = useState<ActiveDrag | null>(null);
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(() => new Set());
+  const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const [marquee, setMarquee] = useState<MarqueeBox | null>(null);
   const marqueePointerId = useRef<number | null>(null);
   const marqueeBaseSelection = useRef<Set<string>>(new Set());
   const tileRefs = useRef<Map<string, RegisteredTile>>(new Map());
   const [tags, setTagsState] = useState<Record<string, RepoTag>>(readAllTags);
-  const [workDirs, setWorkDirs] = useState<string[]>(readWorkDirs);
+  const [categories, setCategories] = useState<CategoryDef[]>(readCategories);
+  const [hiddenSubs, setHiddenSubs] = useState<Record<string, Set<string>>>(readHiddenSubs);
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
 
   const { setPageContext } = useChat();
-  useEffect(() => {
-    setPageContext({ route: "/organize", title: "Foyer 整理" });
-  }, [setPageContext]);
 
   const { data: devicesData = [], isLoading } = useQuery({
     ...orpc.devices.list.queryOptions(),
@@ -393,42 +450,62 @@ function OrganizePage() {
   const allRepos = useMemo(() => devicesData.flatMap((root) => root.repos), [devicesData]);
   const repoByPath = useMemo(() => new Map(allRepos.map((repo) => [repo.path, repo])), [allRepos]);
 
+  useEffect(() => {
+    const selectedRepos = Array.from(selectedPaths)
+      .map((path) => {
+        const repo = repoByPath.get(path);
+        return repo ? { path: repo.path, name: repo.repo, description: repo.description } : null;
+      })
+      .filter(Boolean);
+    setPageContext({
+      route: "/organize",
+      title: "Foyer 整理",
+      extra: { selectedRepos, selectionCount: selectedPaths.size, isMultiSelectMode },
+    });
+  }, [selectedPaths, isMultiSelectMode, repoByPath, setPageContext]);
+
   const leftGroups = useMemo(() => {
     const grouped = new Map<string, Repo[]>();
     for (const [path, tag] of Object.entries(tags)) {
       const repo = repoByPath.get(path);
       if (!repo) continue;
-      const key = tag.category === "work" && tag.workDir ? `work::${tag.workDir}` : tag.category;
+      const hidden = hiddenSubs[tag.categoryId];
+      const key =
+        tag.subCategory && !hidden?.has(tag.subCategory)
+          ? `${tag.categoryId}::${tag.subCategory}`
+          : tag.categoryId;
       const repos = grouped.get(key) ?? [];
       repos.push(repo);
       grouped.set(key, repos);
     }
 
-    const result: Array<{ id: string; category: Category; workDir?: string; repos: Repo[] }> = [
-      { id: "pane-goal", category: "goal", repos: sortRepos(grouped.get("goal") ?? [], sortMode) },
-      { id: "pane-work", category: "work", repos: sortRepos(grouped.get("work") ?? [], sortMode) },
-    ];
+    const result: Array<{
+      id: string;
+      category: CategoryDef;
+      subCategory?: string;
+      repos: Repo[];
+    }> = [];
 
-    for (const dir of workDirs) {
+    for (const cat of categories) {
       result.push({
-        id: `pane-work-${dir}`,
-        category: "work",
-        workDir: dir,
-        repos: sortRepos(grouped.get(`work::${dir}`) ?? [], sortMode),
+        id: `pane-${cat.id}`,
+        category: cat,
+        repos: sortRepos(grouped.get(cat.id) ?? [], sortMode),
       });
+      const hidden = hiddenSubs[cat.id];
+      for (const sub of cat.subCategories) {
+        if (hidden?.has(sub)) continue;
+        result.push({
+          id: `pane-${cat.id}-${sub}`,
+          category: cat,
+          subCategory: sub,
+          repos: sortRepos(grouped.get(`${cat.id}::${sub}`) ?? [], sortMode),
+        });
+      }
     }
 
-    result.push(
-      { id: "pane-life", category: "life", repos: sortRepos(grouped.get("life") ?? [], sortMode) },
-      {
-        id: "pane-explore",
-        category: "explore",
-        repos: sortRepos(grouped.get("explore") ?? [], sortMode),
-      },
-    );
-
     return result;
-  }, [repoByPath, sortMode, tags, workDirs]);
+  }, [repoByPath, sortMode, tags, categories, hiddenSubs]);
 
   const unclassifiedGroups = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -474,7 +551,27 @@ function OrganizePage() {
     else tileRefs.current.delete(path);
   }, []);
 
-  const toggleSelection = useCallback((path: string) => {
+  const handleCardClick = useCallback(
+    (path: string) => {
+      if (isMultiSelectMode) {
+        setSelectedPaths((prev) => {
+          const next = new Set(prev);
+          if (next.has(path)) next.delete(path);
+          else next.add(path);
+          return next;
+        });
+      } else {
+        setSelectedPaths((prev) => {
+          if (prev.has(path) && prev.size === 1) return new Set();
+          return new Set([path]);
+        });
+      }
+    },
+    [isMultiSelectMode],
+  );
+
+  const handleCheckboxClick = useCallback((path: string) => {
+    setIsMultiSelectMode(true);
     setSelectedPaths((prev) => {
       const next = new Set(prev);
       if (next.has(path)) next.delete(path);
@@ -483,11 +580,16 @@ function OrganizePage() {
     });
   }, []);
 
+  useEffect(() => {
+    if (selectedPaths.size === 0) setIsMultiSelectMode(false);
+  }, [selectedPaths]);
+
   const clearSelection = useCallback(() => {
     setSelectedPaths(new Set());
   }, []);
 
   const selectVisibleUnclassified = useCallback(() => {
+    setIsMultiSelectMode(true);
     setSelectedPaths(new Set(unclassifiedRepos.map((repo) => repo.path)));
   }, [unclassifiedRepos]);
 
@@ -512,6 +614,7 @@ function OrganizePage() {
       event.preventDefault();
       event.currentTarget.setPointerCapture(event.pointerId);
       marqueePointerId.current = event.pointerId;
+      setIsMultiSelectMode(true);
       marqueeBaseSelection.current =
         event.metaKey || event.ctrlKey || event.shiftKey ? new Set(selectedPaths) : new Set();
 
@@ -573,7 +676,10 @@ function OrganizePage() {
     const drop = event.over?.data.current as DropData | undefined;
 
     if (drop?.type === "category") {
-      writeRepoTags(paths, { category: drop.category, workDir: drop.workDir });
+      writeRepoTags(paths, {
+        categoryId: drop.categoryId,
+        subCategory: drop.subCategory,
+      });
     } else if (drop?.type === "unclassified") {
       writeRepoTags(paths, null);
     }
@@ -665,10 +771,11 @@ function OrganizePage() {
                 key={group.id}
                 id={group.id}
                 category={group.category}
-                workDir={group.workDir}
+                subCategory={group.subCategory}
                 repos={group.repos}
                 selectedPaths={selectedPaths}
-                onToggle={toggleSelection}
+                onCardClick={handleCardClick}
+                onCheckboxClick={handleCheckboxClick}
                 registerTile={registerTile}
                 onMarqueeStart={startMarquee}
                 onMarqueeMove={moveMarquee}
@@ -681,7 +788,8 @@ function OrganizePage() {
             groups={unclassifiedGroups}
             count={unclassifiedRepos.length}
             selectedPaths={selectedPaths}
-            onToggle={toggleSelection}
+            onCardClick={handleCardClick}
+            onCheckboxClick={handleCheckboxClick}
             registerTile={registerTile}
             onMarqueeStart={startMarquee}
             onMarqueeMove={moveMarquee}
@@ -705,11 +813,16 @@ function OrganizePage() {
       <TagManageDialog
         open={tagDialogOpen}
         onOpenChange={setTagDialogOpen}
-        workDirs={workDirs}
+        categories={categories}
+        hiddenSubs={hiddenSubs}
         tags={tags}
-        onWorkDirsChange={(dirs) => {
-          writeWorkDirs(dirs);
-          setWorkDirs(dirs);
+        onCategoriesChange={(cats) => {
+          writeCategories(cats);
+          setCategories(cats);
+        }}
+        onHiddenSubsChange={(hidden) => {
+          writeHiddenSubs(hidden);
+          setHiddenSubs(hidden);
         }}
         onRefreshTags={() => setTagsState(readAllTags())}
       />

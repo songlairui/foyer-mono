@@ -13,8 +13,8 @@ import { FullscreenButton } from "#/components/home/FullscreenButton";
 import { CategoryPane } from "#/components/home/CategoryPane";
 import { RepoCard } from "#/components/home/RepoCard";
 import { ScrollArea } from "#/components/ui/scroll-area";
-import type { Repo, RepoTag, Category } from "#/components/home/types";
-import { readAllTags, readWorkDirs } from "#/components/home/storage";
+import type { Repo, RepoTag, CategoryDef } from "#/components/home/types";
+import { readAllTags, readCategories } from "#/components/home/storage";
 import { useChat } from "#/components/chat/ChatContext";
 
 export const Route = createFileRoute("/")({ component: HomePage });
@@ -26,7 +26,7 @@ function HomePage() {
   const inFlight = useRef<Set<string>>(new Set());
 
   const [tags] = useState<Record<string, RepoTag>>(readAllTags);
-  const [workDirs] = useState<string[]>(readWorkDirs);
+  const [categories] = useState<CategoryDef[]>(readCategories);
   const [ungroupedSearch, setUngroupedSearch] = useState("");
 
   const { setPageContext } = useChat();
@@ -53,7 +53,12 @@ function HomePage() {
   // keyboard shortcuts
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "/" && document.activeElement !== searchRef.current) {
+      // 输入元素内不拦截 / 键
+      const el = document.activeElement;
+      const tag = el?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || (el as HTMLElement)?.isContentEditable) return;
+
+      if (e.key === "/") {
         e.preventDefault();
         searchRef.current?.focus();
       }
@@ -88,9 +93,13 @@ function HomePage() {
     [agentStatus?.online, openMutation, allRepos, recheckAgent],
   );
 
-  // Left panes grouped - 始终显示4个主分组，工作分组再显示子方向
   const leftGroups = useMemo(() => {
-    const result: Array<{ category: Category; workDir?: string; repos: Repo[]; id: string }> = [];
+    const result: Array<{
+      category: CategoryDef;
+      subCategory?: string;
+      repos: Repo[];
+      id: string;
+    }> = [];
     const catGroups = new Map<string, Repo[]>();
     const q = search.trim().toLowerCase();
     for (const [path, tag] of Object.entries(tags)) {
@@ -104,30 +113,30 @@ function HomePage() {
       ) {
         continue;
       }
-      const key = tag.category === "work" && tag.workDir ? `work::${tag.workDir}` : tag.category;
+      const key = tag.subCategory ? `${tag.categoryId}::${tag.subCategory}` : tag.categoryId;
       const list = catGroups.get(key) ?? [];
       list.push(repo);
       catGroups.set(key, list);
     }
 
-    // Goal - 始终显示
-    result.push({ category: "goal", repos: catGroups.get("goal") ?? [], id: "pane-goal" });
-
-    // Work - 始终显示主分组，然后子方向
-    result.push({ category: "work", repos: catGroups.get("work") ?? [], id: "pane-work" });
-    for (const dir of workDirs) {
-      const sub = catGroups.get(`work::${dir}`);
-      result.push({ category: "work", workDir: dir, repos: sub ?? [], id: `pane-work-${dir}` });
+    for (const cat of categories) {
+      result.push({
+        category: cat,
+        repos: catGroups.get(cat.id) ?? [],
+        id: `pane-${cat.id}`,
+      });
+      for (const sub of cat.subCategories) {
+        result.push({
+          category: cat,
+          subCategory: sub,
+          repos: catGroups.get(`${cat.id}::${sub}`) ?? [],
+          id: `pane-${cat.id}-${sub}`,
+        });
+      }
     }
 
-    // Life - 始终显示
-    result.push({ category: "life", repos: catGroups.get("life") ?? [], id: "pane-life" });
-
-    // Explore - 始终显示
-    result.push({ category: "explore", repos: catGroups.get("explore") ?? [], id: "pane-explore" });
-
     return result;
-  }, [tags, allRepos, workDirs, search]);
+  }, [tags, allRepos, categories, search]);
 
   const ungroupedRepos = useMemo(() => {
     const q = ungroupedSearch.trim().toLowerCase();
@@ -221,7 +230,7 @@ function HomePage() {
                   key={group.id}
                   id={group.id}
                   category={group.category}
-                  workDir={group.workDir}
+                  subCategory={group.subCategory}
                   repos={group.repos}
                   agentOnline={agentStatus?.online ?? false}
                   onOpen={handleOpen}

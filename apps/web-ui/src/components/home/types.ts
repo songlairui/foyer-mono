@@ -16,9 +16,16 @@ export interface Repo {
   worktrees?: Worktree[];
 }
 
-export type Category = "goal" | "work" | "life" | "explore";
+export interface CategoryDef {
+  id: string;
+  label: string;
+  icon: string;
+  color: string;
+  bg: string;
+  subCategories: string[];
+}
 
 export interface RepoTag {
-  category: Category;
-  workDir?: string;
+  categoryId: string;
+  subCategory?: string;
 }
