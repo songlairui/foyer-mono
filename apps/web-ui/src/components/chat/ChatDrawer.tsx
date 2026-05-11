@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { Send, ChevronUp } from "lucide-react";
 import { motion } from "motion/react";
 import { useChat } from "./ChatContext";
-import { addNote } from "./NoteStorage";
+import { orpc } from "#/orpc/client";
 import { toast } from "sonner";
 
 const DRAFT_KEY = "foyer.chat.draft";
@@ -22,6 +23,8 @@ export function ChatDrawer() {
   const toggle = useCallback(() => (isOpen ? close() : open()), [isOpen, open, close]);
   const isOpenRef = useRef(isOpen);
   isOpenRef.current = isOpen;
+
+  const termMutation = useMutation(orpc.agent.term.mutationOptions());
 
   // 全局快捷键 c — 输入元素内不触发
   useEffect(() => {
@@ -67,17 +70,23 @@ export function ChatDrawer() {
     }
   }, [isOpen]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const content = input.trim();
     if (!content) return;
 
-    const ctxSummary = `${pageContext.title} (${pageContext.route})`;
-    addNote(content, ctxSummary);
-    toast.success("已保存为笔记");
+    try {
+      await termMutation.mutateAsync({ cmd: content });
+      toast.success("已在 Ghostty 中打开");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "打开失败");
+      return;
+    }
+
     setInput("");
     try {
       localStorage.removeItem(DRAFT_KEY);
     } catch {}
+    close();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -87,9 +96,9 @@ export function ChatDrawer() {
       close();
       return;
     }
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey && !termMutation.isPending) {
       e.preventDefault();
-      handleSend();
+      void handleSend();
     }
   };
 
@@ -142,8 +151,8 @@ export function ChatDrawer() {
                 className="flex-1 resize-none bg-transparent text-sm placeholder:text-muted-foreground/40 focus:outline-none min-h-10"
               />
               <button
-                onClick={handleSend}
-                disabled={!input.trim()}
+                onClick={() => void handleSend()}
+                disabled={!input.trim() || termMutation.isPending}
                 className="shrink-0 rounded-lg p-1.5 text-blue-400 hover:bg-blue-500/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 aria-label="发送"
               >

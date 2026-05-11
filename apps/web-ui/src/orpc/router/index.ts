@@ -1,5 +1,5 @@
 import { addTodo, listTodos } from "./todos";
-import { agentHealth, openRepo, revealRepo } from "./agent";
+import { agentHealth, openRepo, revealRepo, openTerm } from "./agent";
 import { listDevices } from "./devices";
 
 export default {
@@ -9,6 +9,7 @@ export default {
     health: agentHealth,
     open: openRepo,
     reveal: revealRepo,
+    term: openTerm,
   },
   devices: {
     list: listDevices,

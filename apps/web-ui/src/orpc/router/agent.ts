@@ -1,4 +1,6 @@
 import { os } from "@orpc/server";
+import { execFile } from "node:child_process";
+import { platform } from "node:os";
 import * as z from "zod";
 
 const AGENT_BASE = "http://127.0.0.1:7070";
@@ -42,5 +44,52 @@ export const revealRepo = os
     const url = new URL(`${AGENT_BASE}/reveal`);
     url.searchParams.set("path", input.path);
     await fetch(url.toString(), { signal: AbortSignal.timeout(3000) });
+    return { ok: true };
+  });
+
+export const openTerm = os
+  .input(
+    z.object({
+      cmd: z.string().min(1),
+      dir: z.string().optional(),
+    }),
+  )
+  .handler(({ input }) => {
+    const dir = input.dir ?? process.cwd();
+
+    if (platform() === "darwin") {
+      // AppleScript: 通过 stdin 传脚本（避免 -e 参数中的编码问题），中文不乱码
+      const asEsc = (s: string) => s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+      const safeCmd = input.cmd.replace(/'/g, "'\\''");
+      const shell = process.env.SHELL || "/bin/fish";
+      const shellCmd = `${shell} -l -c '${safeCmd}'`;
+      const script = [
+        'tell application "Ghostty"',
+        "    set cfg to new surface configuration",
+        "    tell cfg",
+        `        set initial working directory to "${asEsc(dir)}"`,
+        `        set command to "${asEsc(shellCmd)}"`,
+        "        set wait after command to true",
+        "    end tell",
+        "    try",
+        "        set w to front window",
+        "        new tab in w with configuration cfg",
+        "    on error",
+        "        new window with configuration cfg",
+        "    end try",
+        "    activate",
+        "end tell",
+      ].join("\n");
+      // 通过 stdin 传脚本，避免 -e 参数可能引发的编码问题
+      const proc = execFile("osascript", ["-"]);
+      proc.stdin!.write(script);
+      proc.stdin!.end();
+    } else {
+      const shell = process.env.SHELL || "/bin/sh";
+      const safeCmd = input.cmd.replace(/'/g, "'\\''");
+      execFile("ghostty", ["--working-directory=" + dir, "-e", shell, "-c", safeCmd], (err) => {
+        if (err) console.error("term open error:", err.message);
+      });
+    }
     return { ok: true };
   });
