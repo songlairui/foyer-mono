@@ -3,6 +3,7 @@ import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
+import { PwaRegister } from "#/components/PwaRegister";
 import { Toaster } from "#/components/ui/sonner";
 
 import appCss from "../styles.css?url";
@@ -33,6 +34,10 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         rel: "stylesheet",
         href: appCss,
       },
+      {
+        rel: "manifest",
+        href: "/manifest.webmanifest",
+      },
     ],
   }),
   shellComponent: RootDocument,
@@ -46,6 +51,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         <TooltipProvider>
+          <PwaRegister />
           {children}
           <Toaster richColors position="bottom-right" />
           <TanStackDevtools
