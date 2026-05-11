@@ -25,14 +25,26 @@ function HomePage() {
   const searchRef = useRef<HTMLInputElement>(null);
   const inFlight = useRef<Set<string>>(new Set());
 
-  const [tags] = useState<Record<string, RepoTag>>(readAllTags);
-  const [categories] = useState<CategoryDef[]>(readCategories);
+  const [tags, setTags] = useState<Record<string, RepoTag>>({});
+  const [categories, setCategories] = useState<CategoryDef[]>([]);
+
+  // 仅在客户端加载 localStorage 数据，避免 SSR hydration mismatch
+  useEffect(() => {
+    setTags(readAllTags());
+    setCategories(readCategories());
+  }, []);
   const [ungroupedSearch, setUngroupedSearch] = useState("");
 
   const { setPageContext } = useChat();
   useEffect(() => {
     setPageContext({ route: "/", title: "Foyer 仪表盘" });
   }, [setPageContext]);
+
+  // Lock body scroll on this page
+  useEffect(() => {
+    document.body.classList.add("overflow-hidden");
+    return () => document.body.classList.remove("overflow-hidden");
+  }, []);
 
   const devicesQueryOptions = orpc.devices.list.queryOptions();
   const {

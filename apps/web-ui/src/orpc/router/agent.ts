@@ -48,23 +48,30 @@ export const revealRepo = os
   });
 
 /**
- * 写临时 shell 脚本再执行，避免中文/特殊字符经过
+ * 通过临时文件传递命令，避免中文/特殊字符经过
  * AppleScript → Ghostty → shell 多层引用时丢失或乱码。
- * 脚本路径只有安全 ASCII 字符，AppleScript 只传路径，不涉及输入内容。
+ *
+ * 策略：
+ * 1. 把 pi 命令写入独立 .cmd 文件（无转义风险）
+ * 2. 用 sh wrapper 将 .cmd 文件喂给 fish 的 stdin，让 fish 逐行执行
+ * 3. 脚本路径只有安全 ASCII 字符，AppleScript 只传路径，不涉及输入内容
  */
 function openInGhostty(dir: string, rawInput: string) {
   const shell = process.env.SHELL || "/bin/fish";
   const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const tmpCmd = `/tmp/pi-cmd-${stamp}`;
   const tmpSh = `/tmp/pi-${stamp}.sh`;
 
-  // 嵌入到 shell 脚本中，只转义输入中的单引号
-  const quoted = rawInput.replace(/'/g, "'\\''");
-  writeFileSync(tmpSh, `#!/bin/sh\n${shell} -l -c 'pi ${quoted}'\nrm -f '${tmpSh}'\n`, {
+  // 将用户命令原样写入文件，不经过任何 shell 转义
+  writeFileSync(tmpCmd, `pi ${rawInput}\n`, { mode: 0o644 });
+
+  // sh wrapper: 将 cmd 文件内容通过 stdin 喂给 fish，避免 -c 的引用地狱
+  writeFileSync(tmpSh, `#!/bin/sh\n${shell} -l < '${tmpCmd}'\nrm -f '${tmpCmd}' '${tmpSh}'\n`, {
     mode: 0o755,
   });
 
   const asEsc = (s: string) => s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-  const script = [
+  const appleScript = [
     'tell application "Ghostty"',
     "    set cfg to new surface configuration",
     "    tell cfg",
@@ -82,7 +89,7 @@ function openInGhostty(dir: string, rawInput: string) {
     "end tell",
   ].join("\n");
 
-  execFile("osascript", ["-e", script], (err) => {
+  execFile("osascript", ["-e", appleScript], (err) => {
     if (err) console.error("term open error:", err.message);
   });
 }

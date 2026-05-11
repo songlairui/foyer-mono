@@ -157,7 +157,11 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
-html,
+html {
+  overscroll-behavior: none;
+  min-height: 100%;
+}
+
 body,
 #app {
   min-height: 100%;

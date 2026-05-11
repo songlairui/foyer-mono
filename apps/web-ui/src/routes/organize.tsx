@@ -434,12 +434,25 @@ function OrganizePage() {
   const marqueePointerId = useRef<number | null>(null);
   const marqueeBaseSelection = useRef<Set<string>>(new Set());
   const tileRefs = useRef<Map<string, RegisteredTile>>(new Map());
-  const [tags, setTagsState] = useState<Record<string, RepoTag>>(readAllTags);
-  const [categories, setCategories] = useState<CategoryDef[]>(readCategories);
-  const [hiddenSubs, setHiddenSubs] = useState<Record<string, Set<string>>>(readHiddenSubs);
+  const [tags, setTagsState] = useState<Record<string, RepoTag>>({});
+  const [categories, setCategories] = useState<CategoryDef[]>([]);
+  const [hiddenSubs, setHiddenSubs] = useState<Record<string, Set<string>>>({});
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
 
+  // 仅在客户端加载 localStorage 数据，避免 SSR hydration mismatch
+  useEffect(() => {
+    setTagsState(readAllTags());
+    setCategories(readCategories());
+    setHiddenSubs(readHiddenSubs());
+  }, []);
+
   const { setPageContext } = useChat();
+
+  // Lock body scroll on this page
+  useEffect(() => {
+    document.body.classList.add("overflow-hidden");
+    return () => document.body.classList.remove("overflow-hidden");
+  }, []);
 
   const { data: devicesData = [], isLoading } = useQuery({
     ...orpc.devices.list.queryOptions(),

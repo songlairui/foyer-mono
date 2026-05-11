@@ -429,18 +429,14 @@ export function FlyingFlipCard({
   }, []);
 
   const flightStyle: CSSProperties = {
-    width,
-    height,
-    left: metrics ? metrics.left : "50%",
-    top: metrics ? metrics.top : "50%",
+    width: "100%",
+    height: "100%",
     opacity: metrics ? 1 : 0,
     transform: metrics
       ? buildTransform(metrics.offsetX, metrics.offsetY, metrics.scaleX, metrics.scaleY, 0)
       : "translate(-50%, -50%)",
     transformOrigin: "center center",
     transformStyle: "preserve-3d",
-    perspective: "1200px",
-    willChange: "transform, opacity",
     pointerEvents: phase === "arrived" ? "auto" : "none",
   };
 
@@ -464,21 +460,27 @@ export function FlyingFlipCard({
       {renderSlot(overlay, state)}
 
       <div
-        ref={flightRef}
-        data-phase={phase}
         className={cn("fixed", className)}
-        style={flightStyle}
+        style={{
+          perspective: "1200px",
+          width,
+          height,
+          left: metrics ? metrics.left : "50%",
+          top: metrics ? metrics.top : "50%",
+        }}
       >
-        <div
-          ref={cardRef}
-          className="group relative h-full w-full"
-          style={cardStyle}
-          onPointerMove={handlePointerMove}
-          onPointerLeave={resetPointer}
-          onPointerCancel={resetPointer}
-        >
-          <FlyingFace>{renderSlot(front, state)}</FlyingFace>
-          <FlyingFace back>{renderSlot(back, state)}</FlyingFace>
+        <div ref={flightRef} data-phase={phase} style={flightStyle}>
+          <div
+            ref={cardRef}
+            className="group relative h-full w-full"
+            style={cardStyle}
+            onPointerMove={handlePointerMove}
+            onPointerLeave={resetPointer}
+            onPointerCancel={resetPointer}
+          >
+            <FlyingFace>{renderSlot(front, state)}</FlyingFace>
+            <FlyingFace back>{renderSlot(back, state)}</FlyingFace>
+          </div>
         </div>
       </div>
     </div>

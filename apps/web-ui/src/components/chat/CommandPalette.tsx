@@ -79,9 +79,14 @@ export function CommandPalette() {
         value={input}
         onValueChange={setInput}
         onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey && piText) {
-            e.preventDefault();
-            void runPi(piText);
+          if (e.key === "Enter" && !e.shiftKey) {
+            // 直接从 DOM 读取，避免 React 批处理导致的闭包过期
+            const val = (e.target as HTMLInputElement).value.trim();
+            if (val) {
+              e.preventDefault();
+              e.stopPropagation();
+              void runPi(val);
+            }
           }
         }}
       />
@@ -90,8 +95,8 @@ export function CommandPalette() {
         <CommandEmpty>无匹配结果，按 Enter 在终端执行</CommandEmpty>
 
         {piText && (
-          <CommandGroup heading="终端执行">
-            <CommandItem onSelect={() => void runPi(piText)}>
+          <CommandGroup heading="终端执行" forceMount>
+            <CommandItem onSelect={() => void runPi(piText)} value={piText}>
               <Terminal className="h-4 w-4 text-muted-foreground" />
               <span className="truncate">
                 pi <span className="text-foreground">{piText}</span>
