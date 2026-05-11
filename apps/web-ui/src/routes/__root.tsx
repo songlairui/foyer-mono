@@ -5,6 +5,8 @@ import { TanStackDevtools } from "@tanstack/react-devtools";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import { PwaRegister } from "#/components/PwaRegister";
 import { Toaster } from "#/components/ui/sonner";
+import { ChatProvider } from "#/components/chat/ChatContext";
+import { ChatDrawer } from "#/components/chat/ChatDrawer";
 
 import appCss from "../styles.css?url";
 
@@ -52,7 +54,10 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <body>
         <TooltipProvider>
           <PwaRegister />
-          {children}
+          <ChatProvider>
+            {children}
+            <ChatDrawer />
+          </ChatProvider>
           <Toaster richColors position="bottom-right" />
           <TanStackDevtools
             config={{

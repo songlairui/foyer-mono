@@ -13,9 +13,10 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { ArrowLeft, FolderSearch, GripVertical, Search, Tags } from "lucide-react";
+import { ArrowLeft, FolderSearch, GripVertical, Search, Settings, Tags } from "lucide-react";
 import {
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -26,9 +27,11 @@ import { Button } from "#/components/ui/button";
 import { Input } from "#/components/ui/input";
 import { ScrollArea } from "#/components/ui/scroll-area";
 import { orpc } from "#/orpc/client";
-import { readAllTags, readWorkDirs, writeTag } from "#/components/home/storage";
+import { readAllTags, readWorkDirs, writeTag, writeWorkDirs } from "#/components/home/storage";
 import type { Category, Repo, RepoTag } from "#/components/home/types";
 import { CAT_META } from "#/components/home/utils";
+import { TagManageDialog } from "#/components/home/TagManageDialog";
+import { useChat } from "#/components/chat/ChatContext";
 
 export const Route = createFileRoute("/organize")({ component: OrganizePage });
 
@@ -373,7 +376,13 @@ function OrganizePage() {
   const marqueeBaseSelection = useRef<Set<string>>(new Set());
   const tileRefs = useRef<Map<string, RegisteredTile>>(new Map());
   const [tags, setTagsState] = useState<Record<string, RepoTag>>(readAllTags);
-  const workDirs = useMemo(readWorkDirs, []);
+  const [workDirs, setWorkDirs] = useState<string[]>(readWorkDirs);
+  const [tagDialogOpen, setTagDialogOpen] = useState(false);
+
+  const { setPageContext } = useChat();
+  useEffect(() => {
+    setPageContext({ route: "/organize", title: "Foyer 整理" });
+  }, [setPageContext]);
 
   const { data: devicesData = [], isLoading } = useQuery({
     ...orpc.devices.list.queryOptions(),
@@ -631,6 +640,14 @@ function OrganizePage() {
           >
             全选未分类
           </Button>
+          <Button
+            size="icon-xs"
+            variant="ghost"
+            className="h-6 w-6"
+            onClick={() => setTagDialogOpen(true)}
+          >
+            <Settings className="h-3.5 w-3.5" />
+          </Button>
         </div>
       </header>
 
@@ -684,6 +701,18 @@ function OrganizePage() {
           加载中…
         </div>
       ) : null}
+
+      <TagManageDialog
+        open={tagDialogOpen}
+        onOpenChange={setTagDialogOpen}
+        workDirs={workDirs}
+        tags={tags}
+        onWorkDirsChange={(dirs) => {
+          writeWorkDirs(dirs);
+          setWorkDirs(dirs);
+        }}
+        onRefreshTags={() => setTagsState(readAllTags())}
+      />
     </div>
   );
 }

@@ -15,6 +15,7 @@ import { RepoCard } from "#/components/home/RepoCard";
 import { ScrollArea } from "#/components/ui/scroll-area";
 import type { Repo, RepoTag, Category } from "#/components/home/types";
 import { readAllTags, readWorkDirs } from "#/components/home/storage";
+import { useChat } from "#/components/chat/ChatContext";
 
 export const Route = createFileRoute("/")({ component: HomePage });
 
@@ -27,6 +28,11 @@ function HomePage() {
   const [tags] = useState<Record<string, RepoTag>>(readAllTags);
   const [workDirs] = useState<string[]>(readWorkDirs);
   const [ungroupedSearch, setUngroupedSearch] = useState("");
+
+  const { setPageContext } = useChat();
+  useEffect(() => {
+    setPageContext({ route: "/", title: "Foyer 仪表盘" });
+  }, [setPageContext]);
 
   const devicesQueryOptions = orpc.devices.list.queryOptions();
   const {
