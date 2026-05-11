@@ -11,6 +11,8 @@ import { FolderSearch, Circle, RefreshCw, Search, Tags } from "lucide-react";
 // Import our components
 import { FullscreenButton } from "#/components/home/FullscreenButton";
 import { CategoryPane } from "#/components/home/CategoryPane";
+import { RepoCard } from "#/components/home/RepoCard";
+import { ScrollArea } from "#/components/ui/scroll-area";
 import type { Repo, RepoTag, Category } from "#/components/home/types";
 import { readAllTags, readWorkDirs } from "#/components/home/storage";
 
@@ -24,6 +26,7 @@ function HomePage() {
 
   const [tags] = useState<Record<string, RepoTag>>(readAllTags);
   const [workDirs] = useState<string[]>(readWorkDirs);
+  const [ungroupedSearch, setUngroupedSearch] = useState("");
 
   const devicesQueryOptions = orpc.devices.list.queryOptions();
   const {
@@ -120,92 +123,149 @@ function HomePage() {
     return result;
   }, [tags, allRepos, workDirs, search]);
 
+  const ungroupedRepos = useMemo(() => {
+    const q = ungroupedSearch.trim().toLowerCase();
+    return allRepos.filter((repo) => {
+      if (tags[repo.path]) return false;
+      if (!q) return true;
+      return (
+        repo.repo.toLowerCase().includes(q) ||
+        repo.path.toLowerCase().includes(q) ||
+        (repo.description?.toLowerCase().includes(q) ?? false)
+      );
+    });
+  }, [allRepos, tags, ungroupedSearch]);
+
   const cacheAge = dataUpdatedAt ? Math.floor((Date.now() - dataUpdatedAt) / 60_000) : null;
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-black text-foreground">
-      {/* ── Header ── */}
-      <header className="flex items-center gap-3 border-b border-border/30 px-5 py-2.5 shrink-0 bg-black/95">
-        <div className="flex items-center gap-2 shrink-0">
-          <FolderSearch className="h-4 w-4 text-primary" />
-          <span className="text-sm font-semibold">Foyer</span>
-          <Badge variant="outline" className="text-[10px] px-1.5">
-            {allRepos.length}
-          </Badge>
-        </div>
+    <div className="flex h-screen overflow-hidden bg-black text-foreground">
+      {/* ── 主内容区：header + body ── */}
+      <div className="flex flex-col flex-1 overflow-hidden">
+        {/* ── Header ── */}
+        <header className="flex items-center gap-3 border-b border-border/30 px-5 py-2.5 shrink-0 bg-black/95">
+          <div className="flex items-center gap-2 shrink-0">
+            <FolderSearch className="h-4 w-4 text-primary" />
+            <span className="text-sm font-semibold">Foyer</span>
+            <Badge variant="outline" className="text-[10px] px-1.5">
+              {allRepos.length}
+            </Badge>
+          </div>
 
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-          <Input
-            ref={searchRef}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="搜索 repo… ( / )"
-            className="pl-8 h-8 text-xs bg-transparent"
-          />
-        </div>
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            <Input
+              ref={searchRef}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="搜索 repo… ( / )"
+              className="pl-8 h-8 text-xs bg-transparent"
+            />
+          </div>
 
-        <div className="ml-auto flex items-center gap-2">
-          {/* Agent status */}
-          {agentStatus === undefined ? (
-            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Circle className="h-2 w-2 fill-muted-foreground animate-pulse" />
-              检查中…
-            </span>
-          ) : (
-            <span
-              className={`flex items-center gap-1.5 text-xs ${agentStatus.online ? "text-green-500" : "text-muted-foreground"}`}
-            >
+          <div className="ml-auto flex items-center gap-2">
+            {agentStatus === undefined ? (
+              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Circle className="h-2 w-2 fill-muted-foreground animate-pulse" />
+                检查中…
+              </span>
+            ) : (
               <span
-                className={`h-2 w-2 rounded-full ${agentStatus.online ? "bg-green-500 shadow-[0_0_6px_2px_rgba(34,197,94,0.5)]" : "bg-muted-foreground"}`}
-              />
-              {agentStatus.online ? `agent · ${agentStatus.opener ?? ""}` : "agent 未启动"}
-            </span>
-          )}
-          {cacheAge !== null && (
-            <span className="text-[11px] text-muted-foreground/50">
-              {cacheAge === 0 ? "刚更新" : `${cacheAge}m 前`}
-            </span>
-          )}
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 px-2 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
-            onClick={() =>
-              void queryClient.invalidateQueries({ queryKey: devicesQueryOptions.queryKey })
-            }
-            disabled={isFetching}
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
-            刷新
-          </Button>
-          <Button asChild size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1.5">
-            <Link to="/organize">
-              <Tags className="h-3.5 w-3.5" />
-              整理
-            </Link>
-          </Button>
-          <FullscreenButton />
-        </div>
-      </header>
+                className={`flex items-center gap-1.5 text-xs ${agentStatus.online ? "text-green-500" : "text-muted-foreground"}`}
+              >
+                <span
+                  className={`h-2 w-2 rounded-full ${agentStatus.online ? "bg-green-500 shadow-[0_0_6px_2px_rgba(34,197,94,0.5)]" : "bg-muted-foreground"}`}
+                />
+                {agentStatus.online ? `agent · ${agentStatus.opener ?? ""}` : "agent 未启动"}
+              </span>
+            )}
+            {cacheAge !== null && (
+              <span className="text-[11px] text-muted-foreground/50">
+                {cacheAge === 0 ? "刚更新" : `${cacheAge}m 前`}
+              </span>
+            )}
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
+              onClick={() =>
+                void queryClient.invalidateQueries({ queryKey: devicesQueryOptions.queryKey })
+              }
+              disabled={isFetching}
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
+              刷新
+            </Button>
+            <Button asChild size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1.5">
+              <Link to="/organize">
+                <Tags className="h-3.5 w-3.5" />
+                整理
+              </Link>
+            </Button>
+            <FullscreenButton />
+          </div>
+        </header>
 
-      {/* ── Body ── */}
-      <div className="flex flex-1 overflow-hidden p-4 gap-4">
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
-          <div className="grid min-h-0 flex-1 grid-cols-2 auto-rows-fr gap-4 overflow-hidden">
-            {leftGroups.map((group) => (
-              <CategoryPane
-                key={group.id}
-                id={group.id}
-                category={group.category}
-                workDir={group.workDir}
-                repos={group.repos}
-                agentOnline={agentStatus?.online ?? false}
-                onOpen={handleOpen}
-              />
-            ))}
+        {/* ── Body ── */}
+        <div className="flex flex-1 overflow-hidden p-4 gap-4">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
+            <div className="grid min-h-0 flex-1 grid-cols-2 auto-rows-fr gap-4 overflow-hidden">
+              {leftGroups.map((group) => (
+                <CategoryPane
+                  key={group.id}
+                  id={group.id}
+                  category={group.category}
+                  workDir={group.workDir}
+                  repos={group.repos}
+                  agentOnline={agentStatus?.online ?? false}
+                  onOpen={handleOpen}
+                />
+              ))}
+            </div>
           </div>
         </div>
+      </div>
+
+      {/* ── 未分组 repos 列 ── */}
+      <div className="flex h-screen w-72 shrink-0 flex-col overflow-hidden border-l border-border/30 bg-card/10">
+        <div className="shrink-0 p-3 border-b border-border/20">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              未分组
+            </span>
+            <Badge variant="outline" className="text-[10px] px-1.5 ml-auto">
+              {ungroupedRepos.length}
+            </Badge>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            <Input
+              value={ungroupedSearch}
+              onChange={(e) => setUngroupedSearch(e.target.value)}
+              placeholder="搜索…"
+              className="pl-8 h-8 text-xs bg-transparent"
+            />
+          </div>
+        </div>
+        <ScrollArea className="min-h-0 flex-1" viewportClassName="[&>div]:!block [&>div]:w-full">
+          <div className="grid grid-cols-1 gap-1.5 p-2">
+            {ungroupedRepos.length === 0 ? (
+              <div className="flex items-center justify-center h-24 text-xs text-muted-foreground/40">
+                {ungroupedSearch ? "无匹配结果" : "全部已分组"}
+              </div>
+            ) : (
+              ungroupedRepos.map((repo) => (
+                <RepoCard
+                  key={repo.path}
+                  repo={repo}
+                  agentOnline={agentStatus?.online ?? false}
+                  onOpen={handleOpen}
+                  compact
+                />
+              ))
+            )}
+          </div>
+        </ScrollArea>
       </div>
     </div>
   );

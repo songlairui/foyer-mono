@@ -11,6 +11,7 @@ interface RepoCardProps {
   repo: Repo;
   agentOnline: boolean;
   onOpen: (path: string) => Promise<void>;
+  compact?: boolean;
   isDragging?: boolean;
   dragOverlay?: boolean;
   showDragHandle?: boolean;
@@ -22,6 +23,7 @@ export function RepoCard({
   repo,
   agentOnline,
   onOpen,
+  compact = false,
   isDragging,
   dragOverlay,
   showDragHandle,
@@ -50,7 +52,7 @@ export function RepoCard({
     <div
       ref={cardRef}
       data-repo-path={repo.path}
-      className={`group flex flex-col gap-1 rounded-xl border bg-card px-4 pt-3 pb-2.5 transition-all hover:border-border/80 hover:bg-accent/10 ${
+      className={`group flex flex-col gap-1 rounded-xl border bg-card transition-all hover:border-border/80 hover:bg-accent/10 ${compact ? "px-3 py-1.5" : "px-4 pt-3 pb-2.5"} ${
         isDragging && !dragOverlay ? "opacity-50" : ""
       } ${dragOverlay ? "opacity-90 cursor-grabbing shadow-2xl" : ""}`}
       style={dragOverlay ? { transform: "rotate(1deg)" } : undefined}
@@ -93,8 +95,7 @@ export function RepoCard({
         </Tooltip>
       </div>
 
-      {/* 描述：最多一行，超出 Tooltip */}
-      {repo.description && (
+      {!compact && repo.description && (
         <Tooltip>
           <TooltipTrigger asChild>
             <p className="text-xs text-muted-foreground truncate cursor-default">
@@ -105,14 +106,16 @@ export function RepoCard({
         </Tooltip>
       )}
 
-      <div className="flex items-center justify-between gap-2 min-w-0">
-        {repo.lastModified ? (
-          <span className="shrink-0 text-[11px] text-muted-foreground/50">
-            {relativeTime(repo.lastModified)}
-          </span>
-        ) : null}
-        {clicks > 0 && <span className="text-[10px] text-muted-foreground/40">{clicks}×</span>}
-      </div>
+      {!compact && (
+        <div className="flex items-center justify-between gap-2 min-w-0">
+          {repo.lastModified ? (
+            <span className="shrink-0 text-[11px] text-muted-foreground/50">
+              {relativeTime(repo.lastModified)}
+            </span>
+          ) : null}
+          {clicks > 0 && <span className="text-[10px] text-muted-foreground/40">{clicks}×</span>}
+        </div>
+      )}
     </div>
   );
 }

@@ -45,7 +45,7 @@ export function CategoryPane({
             <p>拖入项目</p>
           </div>
         ) : (
-          <div className="grid gap-2 pr-2 grid-cols-[repeat(auto-fill,minmax(220px,1fr))]">
+          <div className="flex w-full flex-col gap-2 pr-2">
             {repos.map((repo) => (
               <RepoCard key={repo.path} repo={repo} agentOnline={agentOnline} onOpen={onOpen} />
             ))}
