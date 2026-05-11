@@ -23,9 +23,12 @@ import {
 import {
   repoDevices,
   repoDevicesMulti,
+  repoDevicesMultiWithWorktrees,
+  repoDevicesWithWorktrees,
   repoManifests,
   repoPrepare,
   repoStatus,
+  repoWorktreesByPath,
 } from "../workflows/repo";
 import { repoRootsAdd, repoRootsList, repoRootsRemove } from "../domain/scan-roots";
 import { openProject, setOpener, KNOWN_OPENERS } from "../workflows/open";
@@ -317,17 +320,41 @@ repo
   .command("devices")
   .option("--projects-root <path>", "项目根目录（单根模式，不指定则用默认）")
   .option("--all-roots", "扫描所有已注册的根目录", false)
+  .option("--with-worktrees", "检测每个仓库的 git worktree", false)
   .option("--json", "输出稳定 JSON")
   .description("扫描当前设备上的项目仓库")
   .action(async (options) => {
+    const withWorktrees = Boolean(options.withWorktrees);
     if (options.allRoots) {
-      await run(
-        repoRootsList().pipe(Effect.flatMap((r) => repoDevicesMulti({ roots: r.roots }))),
-        options,
-      );
+      if (withWorktrees) {
+        await run(
+          repoRootsList().pipe(
+            Effect.flatMap((r) => repoDevicesMultiWithWorktrees({ roots: r.roots })),
+          ),
+          options,
+        );
+      } else {
+        await run(
+          repoRootsList().pipe(Effect.flatMap((r) => repoDevicesMulti({ roots: r.roots }))),
+          options,
+        );
+      }
     } else {
-      await run(repoDevices({ projectsRoot: options.projectsRoot }), options);
+      if (withWorktrees) {
+        await run(repoDevicesWithWorktrees({ projectsRoot: options.projectsRoot }), options);
+      } else {
+        await run(repoDevices({ projectsRoot: options.projectsRoot }), options);
+      }
     }
+  });
+
+repo
+  .command("worktrees")
+  .requiredOption("--path <path>", "仓库路径")
+  .option("--json", "输出稳定 JSON")
+  .description("列出指定仓库的 git worktree 列表")
+  .action(async (options) => {
+    await run(repoWorktreesByPath({ path: options.path }), options);
   });
 
 repo

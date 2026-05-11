@@ -1,3 +1,10 @@
+export interface Worktree {
+  path: string;
+  branch: string;
+  bare: boolean;
+  head: string;
+}
+
 export interface Repo {
   repo: string;
   path: string;
@@ -6,6 +13,7 @@ export interface Repo {
   lane?: string;
   slug?: string;
   lastModified?: number;
+  worktrees?: Worktree[];
 }
 
 export type Category = "goal" | "work" | "life" | "explore";

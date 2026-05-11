@@ -9,6 +9,13 @@ const execFileAsync = promisify(execFile);
 
 const FOYER_PATH = join(homedir(), "Library/pnpm/foyer");
 
+export interface Worktree {
+  path: string;
+  branch: string;
+  bare: boolean;
+  head: string;
+}
+
 export interface Repo {
   repo: string;
   path: string;
@@ -17,6 +24,7 @@ export interface Repo {
   lane?: string;
   slug?: string;
   lastModified?: number;
+  worktrees?: Worktree[];
 }
 
 export interface ScanRoot {
@@ -29,6 +37,12 @@ interface FoyerDevice {
   repo: string;
   path: string;
   scanRoot: string;
+  worktrees?: Array<{
+    path: string;
+    branch: string;
+    bare: boolean;
+    head: string;
+  }>;
 }
 
 interface FoyerOutput {
@@ -71,7 +85,11 @@ export const listDevices = os.handler(async () => {
     const execEnv = { env: { ...process.env, HOME: homedir() } };
 
     const [devicesResult, listResult] = await Promise.all([
-      execFileAsync(FOYER_PATH, ["repo", "devices", "--all-roots", "--json"], execEnv),
+      execFileAsync(
+        FOYER_PATH,
+        ["repo", "devices", "--all-roots", "--json", "--with-worktrees"],
+        execEnv,
+      ),
       execFileAsync(FOYER_PATH, ["repo", "list", "--json"], execEnv).catch(() => ({
         stdout: '{"ok":false,"data":{"projects":[]}}',
       })),
@@ -102,6 +120,12 @@ export const listDevices = os.handler(async () => {
           lane: project?.lane,
           slug: project?.slug,
           lastModified,
+          worktrees: d.worktrees?.map((w) => ({
+            path: w.path,
+            branch: w.branch,
+            bare: w.bare,
+            head: w.head,
+          })),
         };
       }),
     );

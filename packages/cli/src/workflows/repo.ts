@@ -7,10 +7,23 @@ import {
   type RepoPrepareResult,
 } from "../domain/contracts";
 import { resolveConfig, projectPath } from "../domain/paths";
-import { FileSystem, Shell } from "../services/context";
+import { FileSystem, Shell, type ShellService } from "../services/context";
 import { listProjects } from "./project-init";
 
-export type RepoDevice = { device: string; repo: string; path: string };
+export type RepoWorktree = {
+  path: string;
+  branch: string;
+  bare: boolean;
+  head: string;
+};
+
+export type RepoDevice = {
+  device: string;
+  repo: string;
+  path: string;
+  worktrees?: RepoWorktree[];
+};
+
 export type RepoDeviceMulti = RepoDevice & { scanRoot: string };
 
 export interface RepoDevicesResult {
@@ -110,6 +123,91 @@ export function repoDevicesMulti(input: {
       humanOutputZh: renderDevicesMulti(devices),
       humanSummaryZh: `${input.roots.length} 个扫描根，共 ${devices.length} 个仓库。`,
     };
+  });
+}
+
+function parseWorktreeList(stdout: string): RepoWorktree[] {
+  const worktrees: RepoWorktree[] = [];
+  let current: Partial<RepoWorktree> | null = null;
+  for (const line of stdout.split("\n")) {
+    if (line.startsWith("worktree ")) {
+      if (current && current.path) worktrees.push(current as RepoWorktree);
+      current = { path: line.slice(9), branch: "", bare: false, head: "" };
+    } else if (line.startsWith("HEAD ")) {
+      if (current) current.head = line.slice(5);
+    } else if (line.startsWith("branch ")) {
+      if (current) current.branch = line.slice(7).replace("refs/heads/", "");
+    } else if (line === "bare") {
+      if (current) current.bare = true;
+    } else if (line === "detached") {
+      if (current) current.branch = "(detached)";
+    }
+  }
+  if (current && current.path) worktrees.push(current as RepoWorktree);
+  return worktrees;
+}
+
+function enrichDevicesWithWorktrees<T extends RepoDevice>(
+  devices: T[],
+  shell: ShellService,
+): Effect.Effect<T[], EntryWorkflowError> {
+  return Effect.forEach(
+    devices,
+    (device) =>
+      Effect.gen(function* () {
+        const result = yield* shell.run("git", ["worktree", "list", "--porcelain"], {
+          cwd: device.path,
+          allowFailure: true,
+        });
+        if (result.exitCode !== 0) return device;
+        const worktrees = parseWorktreeList(result.stdout);
+        return worktrees.length > 0 ? { ...device, worktrees } : device;
+      }),
+    { concurrency: "unbounded" },
+  ) as Effect.Effect<T[], EntryWorkflowError>;
+}
+
+export function repoDevicesWithWorktrees(input: {
+  projectsRoot?: string;
+  deviceName?: string;
+}): Effect.Effect<RepoDevicesResult, EntryWorkflowError, FileSystem | Shell> {
+  return Effect.gen(function* () {
+    const base = yield* repoDevices(input);
+    const shell = yield* Shell;
+    const devices = yield* enrichDevicesWithWorktrees(base.devices, shell);
+    const summary = devices.some((d) => d.worktrees && d.worktrees.length > 0)
+      ? `共 ${devices.length} 个仓库（含 worktree）。`
+      : base.humanSummaryZh;
+    return { devices, humanOutputZh: base.humanOutputZh, humanSummaryZh: summary };
+  });
+}
+
+export function repoDevicesMultiWithWorktrees(input: {
+  roots: string[];
+  deviceName?: string;
+}): Effect.Effect<RepoDevicesMultiResult, EntryWorkflowError, FileSystem | Shell> {
+  return Effect.gen(function* () {
+    const base = yield* repoDevicesMulti(input);
+    const shell = yield* Shell;
+    const devices = yield* enrichDevicesWithWorktrees(base.devices, shell);
+    const summary = devices.some((d) => d.worktrees && d.worktrees.length > 0)
+      ? `${input.roots.length} 个扫描根，共 ${devices.length} 个仓库（含 worktree）。`
+      : base.humanSummaryZh;
+    return { devices, humanOutputZh: base.humanOutputZh, humanSummaryZh: summary };
+  });
+}
+
+export function repoWorktreesByPath(input: {
+  path: string;
+}): Effect.Effect<{ worktrees: RepoWorktree[] }, EntryWorkflowError, Shell> {
+  return Effect.gen(function* () {
+    const shell = yield* Shell;
+    const result = yield* shell.run("git", ["worktree", "list", "--porcelain"], {
+      cwd: input.path,
+      allowFailure: true,
+    });
+    if (result.exitCode !== 0) return { worktrees: [] };
+    return { worktrees: parseWorktreeList(result.stdout) };
   });
 }
 
