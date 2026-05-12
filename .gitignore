@@ -6,3 +6,4 @@ dist/
 .env
 .env.*
 !adapters/claude-code-plugin/.mcp.json
+.idea
